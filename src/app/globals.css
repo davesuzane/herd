@@ -1,26 +1,32 @@
+/* src/app/globals.css */
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-bg: #0F1712;
+  --color-bg-alt: #141F19;
+  --color-surface: #1A2620;
+  --color-surface-2: #20302A;
+  --color-line: #2C3D34;
+  --color-ink: #ECE8DC;
+  --color-ink-dim: #A9B3AA;
+  --color-ink-faint: #6E7A72;
+  --color-safe: #8FBF5E;
+  --color-safe-dim: #3E5230;
+  --color-flag: #D2543C;
+  --color-flag-dim: #4A2B24;
+  --color-tag: #E3B23C;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-zilla);
+  --font-body: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-tag);
+  color: #1a2015;
 }
