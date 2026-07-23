@@ -1,8 +1,11 @@
 // src/app/api/[id]/page.tsx
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import VoteButtons from "@/components/VoteButtons";
-import Reviews from "@/components/Reviews";
 import BoostButton from "@/components/BoostButton";
+import Reviews from "@/components/Reviews";
+import CopyLinkButton from "@/components/CopyLinkButton";
+import DeleteApiButton from "@/components/DeleteApiButton";
 
 export default async function ApiDetail({
   params,
@@ -12,6 +15,9 @@ export default async function ApiDetail({
   const { id } = await params;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { data: api } = await supabase
     .from("apis")
     .select("*")
@@ -34,6 +40,7 @@ export default async function ApiDetail({
     );
 
   const tags = (apiTags || []).map((t: any) => t.tags?.name).filter(Boolean);
+  const isOwner = user?.id === api.submitted_by;
 
   return (
     <main className="max-w-2xl mx-auto px-6 pt-16 pb-24">
@@ -45,7 +52,12 @@ export default async function ApiDetail({
           </span>
         )}
       </div>
-      <p className="text-sm font-mono text-ink-faint mb-4">{api.base_url}</p>
+
+      <div className="flex items-center gap-2 mb-4">
+        <p className="text-sm font-mono text-ink-faint">{api.base_url}</p>
+        <CopyLinkButton url={api.base_url} />
+      </div>
+
       <p className="text-ink-dim leading-relaxed mb-4">{api.description}</p>
 
       {tags.length > 0 && (
@@ -75,12 +87,29 @@ export default async function ApiDetail({
         </div>
       )}
 
-      <div className="flex items-center gap-3 pt-4 border-t border-line">
-        <VoteButtons apiId={api.id} />
-        <BoostButton apiId={api.id} />
+      <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-line">
+        {isOwner ? (
+          <>
+            <span className="text-xs font-mono text-ink-faint">
+              This is your listing
+            </span>
+            <Link
+              href={`/api/${api.id}/edit`}
+              className="text-xs font-mono px-3 py-1.5 rounded-full border border-line text-ink-dim hover:border-ink-faint transition"
+            >
+              Edit
+            </Link>
+            <DeleteApiButton apiId={api.id} />
+          </>
+        ) : (
+          <>
+            <VoteButtons apiId={api.id} />
+            <BoostButton apiId={api.id} />
+          </>
+        )}
       </div>
 
-      <Reviews apiId={api.id} />
+      <Reviews apiId={api.id} isOwner={isOwner} />
     </main>
   );
 }

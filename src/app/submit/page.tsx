@@ -113,13 +113,11 @@ export default function SubmitPage() {
           const { data: urlData } = supabase.storage
             .from("api-images")
             .getPublicUrl(filePath);
-          await supabase
-            .from("api_images")
-            .insert({
-              api_id: api.id,
-              image_url: urlData.publicUrl,
-              uploaded_by: user.id,
-            });
+          await supabase.from("api_images").insert({
+            api_id: api.id,
+            image_url: urlData.publicUrl,
+            uploaded_by: user.id,
+          });
         }
       }
     }
@@ -155,10 +153,13 @@ export default function SubmitPage() {
         </Field>
         <Field label="Description">
           <textarea
+            placeholder="What does it do?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className={inputClass}
             rows={3}
+            required
+            minLength={20}
           />
         </Field>
         <Field label="Tags">
