@@ -29,7 +29,7 @@ export default function BoostButton({ apiId }: { apiId: string }) {
       onClick={handleBoost}
       className="text-xs font-mono px-3 py-1.5 rounded-full border border-tag/40 text-tag hover:bg-tag/10 transition"
     >
-      Boost — $5 / 7 days
+      Boost this listing — $5 / 7 days
     </button>
   );
 }

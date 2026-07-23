@@ -1,11 +1,11 @@
-// src/app/login/page.tsx
+// src/app/signup/page.tsx
 import { Suspense } from "react";
 import AuthForm from "@/components/AuthForm";
 
-export default function LoginPage() {
+export default function SignupPage() {
   return (
     <Suspense>
-      <AuthForm mode="signin" />
+      <AuthForm mode="signup" />
     </Suspense>
   );
 }
