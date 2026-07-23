@@ -89,7 +89,8 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
 
       router.replace(getSafeRedirect());
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("LOGIN DEBUG:", err);
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
