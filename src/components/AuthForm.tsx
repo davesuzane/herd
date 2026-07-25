@@ -4,6 +4,8 @@ import { FormEvent, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import QuickAccountButton from "./QuickAccountButton";
+import CodeLoginForm from "./CodeLoginForm";
 
 function getAuthErrorMessage(errorMessage: string) {
   const m = errorMessage.toLowerCase();
@@ -27,6 +29,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loginMethod, setLoginMethod] = useState<"email" | "code">("email");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -112,65 +115,100 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
             : "Free account, takes a few seconds."}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            disabled={loading}
-            className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
-            required
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={isSignIn ? "current-password" : "new-password"}
-            disabled={loading}
-            className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
-            required
-          />
-
-          {isSignIn && (
-            <div className="text-right">
-              <Link
-                href="/forgot-password"
-                className="text-xs text-ink-faint hover:text-ink-dim transition"
-              >
-                Forgot password?
-              </Link>
+        {!isSignIn && (
+          <div className="mb-5 space-y-4">
+            <QuickAccountButton />
+            <div className="flex items-center gap-3 text-xs text-ink-faint">
+              <div className="flex-1 h-px bg-line" /> or use email{" "}
+              <div className="flex-1 h-px bg-line" />
             </div>
-          )}
+          </div>
+        )}
 
-          {error && (
-            <p role="alert" className="text-flag text-xs">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p role="status" className="text-tag text-xs">
-              {message}
-            </p>
-          )}
+        {isSignIn && (
+          <div className="flex gap-4 mb-4 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setLoginMethod("email")}
+              className={
+                loginMethod === "email" ? "text-tag" : "text-ink-faint"
+              }
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMethod("code")}
+              className={loginMethod === "code" ? "text-tag" : "text-ink-faint"}
+            >
+              Code
+            </button>
+          </div>
+        )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-tag text-[#1a2015] font-semibold py-2.5 rounded hover:brightness-110 transition disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading
-              ? isSignIn
-                ? "Signing in..."
-                : "Creating account..."
-              : isSignIn
-                ? "Sign in"
-                : "Create account"}
-          </button>
-        </form>
+        {isSignIn && loginMethod === "code" ? (
+          <CodeLoginForm />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              disabled={loading}
+              className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
+              required
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={isSignIn ? "current-password" : "new-password"}
+              disabled={loading}
+              className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
+              required
+            />
+
+            {isSignIn && (
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-ink-faint hover:text-ink-dim transition"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
+            {error && (
+              <p role="alert" className="text-flag text-xs">
+                {error}
+              </p>
+            )}
+            {message && (
+              <p role="status" className="text-tag text-xs">
+                {message}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-tag text-[#1a2015] font-semibold py-2.5 rounded hover:brightness-110 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading
+                ? isSignIn
+                  ? "Signing in..."
+                  : "Creating account..."
+                : isSignIn
+                  ? "Sign in"
+                  : "Create account"}
+            </button>
+          </form>
+        )}
 
         <Link
           href={otherModeHref}
