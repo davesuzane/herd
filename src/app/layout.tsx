@@ -5,6 +5,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { Analytics } from "@vercel/analytics/next";
+import SubNav from "@/components/SubNav";
 
 const zilla = Zilla_Slab({
   subsets: ["latin"],
@@ -39,6 +40,9 @@ export default function RootLayout({
     >
       <body className="font-body min-h-screen flex flex-col">
         <Analytics />
+        <Nav />
+        <SubNav />
+        <div className="flex-1">{children}</div>
         <Nav />
         <div className="flex-1">{children}</div>
         <Footer />
