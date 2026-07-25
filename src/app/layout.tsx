@@ -38,6 +38,7 @@ export default function RootLayout({
       className={`${zilla.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
       <body className="font-body min-h-screen flex flex-col">
+        <Analytics />
         <Nav />
         <div className="flex-1">{children}</div>
         <Footer />
