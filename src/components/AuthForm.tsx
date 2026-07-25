@@ -152,7 +152,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
               type="email"
-              placeholder="Soneca nenem"
+              placeholder="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
