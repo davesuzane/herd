@@ -6,20 +6,17 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
-  // in src/app/auth/callback/route.ts, after the exchangeCodeForSession call succeeds:
+
   if (code) {
     const supabase = await createClient();
     const { data } = await supabase.auth.exchangeCodeForSession(code);
+
     if (data?.user) {
       await supabase
         .from("profiles")
         .update({ is_guest: false })
         .eq("id", data.user.id);
     }
-  
-  if (code) {
-    const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
   }
 
   return NextResponse.redirect(`${origin}${next}`);
