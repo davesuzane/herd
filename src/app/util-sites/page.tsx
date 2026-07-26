@@ -11,7 +11,9 @@ export default async function UtilSitesPage() {
     .order("name");
   const { data: links } = await supabase
     .from("useful_links")
-    .select("id, url, title, category_id, submitted_by, created_at")
+    .select(
+      "id, url, title, category_id, submitted_by, created_at, extra_fields",
+    )
     .order("created_at", { ascending: false });
   const { data: pendingRequests } = await supabase
     .from("category_request_counts")

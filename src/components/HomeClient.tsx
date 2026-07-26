@@ -6,6 +6,9 @@ import { createClient } from "@/utils/supabase/client";
 import VoteButtons from "@/components/VoteButtons";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import DeleteApiButton from "@/components/DeleteApiButton";
+import Pagination from "./Pagination";
+
+const PAGE_SIZE = 10;
 
 type Api = {
   id: string;
@@ -33,6 +36,8 @@ export default function HomeClient({
 }) {
   const [query, setQuery] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [freePage, setFreePage] = useState(1);
+  const [paidPage, setPaidPage] = useState(1);
   const supabase = createClient();
 
   useEffect(() => {
@@ -40,6 +45,11 @@ export default function HomeClient({
       .getUser()
       .then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
+
+  useEffect(() => {
+    setFreePage(1);
+    setPaidPage(1);
+  }, [query]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return apis;
@@ -61,6 +71,18 @@ export default function HomeClient({
     .filter((a) => a.pricing_type === "free")
     .sort((a, b) => (isBoosted(b) ? 1 : 0) - (isBoosted(a) ? 1 : 0));
 
+  const paidTotalPages = Math.max(1, Math.ceil(paid.length / PAGE_SIZE));
+  const paidPageItems = paid.slice(
+    (paidPage - 1) * PAGE_SIZE,
+    paidPage * PAGE_SIZE,
+  );
+
+  const freeTotalPages = Math.max(1, Math.ceil(free.length / PAGE_SIZE));
+  const freePageItems = free.slice(
+    (freePage - 1) * PAGE_SIZE,
+    freePage * PAGE_SIZE,
+  );
+
   return (
     <div className="grid md:grid-cols-[1fr_260px] gap-10">
       <div className="space-y-14">
@@ -77,7 +99,7 @@ export default function HomeClient({
               Paid APIs
             </h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              {paid.map((api) => (
+              {paidPageItems.map((api) => (
                 <ApiCard
                   key={api.id}
                   api={api}
@@ -86,13 +108,18 @@ export default function HomeClient({
                 />
               ))}
             </div>
+            <Pagination
+              page={paidPage}
+              totalPages={paidTotalPages}
+              onChange={setPaidPage}
+            />
           </section>
         )}
 
         <section>
           <h2 className="font-display font-semibold text-xl mb-4">Free APIs</h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            {free.map((api) => (
+            {freePageItems.map((api) => (
               <ApiCard
                 key={api.id}
                 api={api}
@@ -104,6 +131,11 @@ export default function HomeClient({
           {filtered.length === 0 && (
             <p className="text-sm text-ink-faint">Nothing matches "{query}".</p>
           )}
+          <Pagination
+            page={freePage}
+            totalPages={freeTotalPages}
+            onChange={setFreePage}
+          />
         </section>
       </div>
 
@@ -156,12 +188,6 @@ export default function HomeClient({
             className="block text-sm text-ink-dim hover:text-tag transition"
           >
             Become Pro
-          </Link>
-          <Link
-            href="/mysink"
-            className="block text-sm text-ink-dim hover:text-tag transition"
-          >
-            Leaked api
           </Link>
         </div>
       </aside>
