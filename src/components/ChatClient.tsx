@@ -25,7 +25,6 @@ export default function ChatClient({
   const [newDmUsername, setNewDmUsername] = useState('')
   const [dmError, setDmError] = useState('')
 
-  // Load message history whenever the active thread changes, and subscribe to new ones
   useEffect(() => {
     if (!thread) return
     let cancelled = false
@@ -67,9 +66,12 @@ export default function ChatClient({
     if (!input.trim() || !thread) return
     if (!currentUserId) { router.push('/login?redirect=/chat'); return }
 
-    const payload = thread.type === 'channel'
-      ? { channel_id: thread.id, sender_id: currentUserId, body: input.trim() }
-      : { conversation_id: thread.id, sender_id: currentUserId, body: input.trim() }
+    const payload = {
+      channel_id: thread.type === 'channel' ? thread.id : null,
+      conversation_id: thread.type === 'dm' ? thread.id : null,
+      sender_id: currentUserId,
+      body: input.trim(),
+    }
 
     const { error } = await supabase.from('chat_messages').insert(payload)
     if (!error) setInput('')
