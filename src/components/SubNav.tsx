@@ -13,6 +13,12 @@ export default function SubNav() {
           Leaked
         </Link>
         <Link
+          href="/chat"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          Chat
+        </Link>
+        <Link
           href="/util-sites"
           className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
         >
