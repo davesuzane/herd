@@ -11,7 +11,9 @@ export default async function MethodsPage() {
     .order("name");
   const { data: methods } = await supabase
     .from("methods")
-    .select("id, title, body, category_id, submitted_by, created_at")
+    .select(
+      "id, title, body, category_id, submitted_by, created_at, extra_fields",
+    )
     .order("created_at", { ascending: false });
   const { data: voteCounts } = await supabase
     .from("method_vote_counts")

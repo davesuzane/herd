@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         .update({ is_guest: false })
         .eq("id", data.user.id);
     }
-  }
+  
   if (code) {
     const supabase = await createClient();
     await supabase.auth.exchangeCodeForSession(code);
