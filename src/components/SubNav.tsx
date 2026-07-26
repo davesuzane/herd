@@ -18,6 +18,12 @@ export default function SubNav() {
         >
           Util Sites
         </Link>
+        <Link
+          href="/methods"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          Methods
+        </Link>
       </div>
     </div>
   );
