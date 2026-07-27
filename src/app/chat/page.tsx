@@ -8,6 +8,18 @@ export default async function ChatPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // 1. Fetch admin status for current user
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .single();
+
+    isAdmin = profile?.is_admin ?? false;
+  }
+
   const { data: channels } = await supabase
     .from("chat_channels")
     .select("*")
@@ -45,6 +57,7 @@ export default async function ChatPage() {
       channels={channels || []}
       conversations={conversations}
       currentUserId={user?.id ?? null}
+      isAdmin={isAdmin}
     />
   );
 }
