@@ -8,7 +8,7 @@ export default async function ChatPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 1. Fetch admin status for current user
+  // Fetch admin status for current user
   let isAdmin = false;
   if (user) {
     const { data: profile } = await supabase
@@ -26,15 +26,6 @@ export default async function ChatPage() {
     .order("name");
 
   let conversations: any[] = [];
-  let isAdmin = false;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .single();
-    isAdmin = profile?.is_admin ?? false;
-  }
   if (user) {
     const { data: convos } = await supabase
       .from("dm_conversations")
@@ -62,6 +53,11 @@ export default async function ChatPage() {
   }
 
   return (
-   return <ChatClient channels={channels || []} conversations={conversations} currentUserId={user?.id ?? null} isAdmin={isAdmin} />
+    <ChatClient
+      channels={channels || []}
+      conversations={conversations}
+      currentUserId={user?.id ?? null}
+      isAdmin={isAdmin}
+    />
   );
 }
