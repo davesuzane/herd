@@ -5,7 +5,8 @@ import Link from "next/link";
 export default function SubNav() {
   return (
     <div className="border-b border-line bg-bg-alt">
-      <div className="max-w-5xl mx-auto px-6 h-10 flex items-center gap-6">
+      {/* Added 'w-full justify-between' here */}
+      <div className="max-w-5xl mx-auto px-6 h-10 flex items-center justify-between w-full">
         <div className="flex items-center gap-6">
           <Link
             href="/leaked"
@@ -26,6 +27,7 @@ export default function SubNav() {
             Methods
           </Link>
         </div>
+
         <div className="flex items-center">
           <Link
             href="/chat"
