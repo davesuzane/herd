@@ -6,16 +6,31 @@ import Link from "next/link";
 import QuickAccountButton from "./QuickAccountButton";
 import CodeLoginForm from "./CodeLoginForm";
 
-// Helper function to generate a fallback username
 function generateRandomName() {
-  const adjectives = ["Anonymous", "Clever", "Swift", "Silent", "Brave", "Curious"];
+  const adjectives = [
+    "Anonymous",
+    "Clever",
+    "Swift",
+    "Silent",
+    "Brave",
+    "Curious",
+  ];
   const animals = ["Panda", "Otter", "Falcon", "Fox", "Wolf", "Lynx"];
   const randomNum = Math.floor(1000 + Math.random() * 9000);
-  
+
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
   const animal = animals[Math.floor(Math.random() * animals.length)];
-  
+
   return `${adj}${animal}${randomNum}`;
+}
+
+// Secure password generator using window.crypto
+function generateStrongPassword(length = 16) {
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=";
+  const array = new Uint32Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (x) => chars[x % chars.length]).join("");
 }
 
 function getAuthErrorMessage(errorMessage: string) {
@@ -41,6 +56,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // Controls password visibility
   const [loginMethod, setLoginMethod] = useState<"email" | "code">("email");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -53,6 +69,13 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
     if (redirect && redirect.startsWith("/") && !redirect.startsWith("//"))
       return redirect;
     return "/";
+  }
+
+  // Handle automatic password generation
+  function handleGeneratePassword() {
+    const newPwd = generateStrongPassword(16);
+    setPassword(newPwd);
+    setShowPassword(true); // Temporarily reveal password so user sees/copies it
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -75,8 +98,9 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
       return;
     }
 
-    // Determine final name or generate one
-    const finalUsername = username.trim() ? username.trim() : generateRandomName();
+    const finalUsername = username.trim()
+      ? username.trim()
+      : generateRandomName();
 
     setLoading(true);
     try {
@@ -90,7 +114,6 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
             password,
             options: {
               emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
-              // Pass username into metadata for the DB trigger
               data: {
                 username: finalUsername,
               },
@@ -192,16 +215,39 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
               required
             />
 
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={isSignIn ? "current-password" : "new-password"}
-              disabled={loading}
-              className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
-              required
-            />
+            {/* Password input with built-in Generate button */}
+            <div className="relative flex items-center">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isSignIn ? "current-password" : "new-password"}
+                disabled={loading}
+                className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm pr-20 focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
+                required
+              />
+
+              {!isSignIn ? (
+                <button
+                  type="button"
+                  onClick={handleGeneratePassword}
+                  disabled={loading}
+                  className="absolute right-2 text-xs font-mono px-2 py-1 bg-surface border border-line rounded text-ink-faint hover:text-ink hover:border-ink-faint transition"
+                >
+                  Generate
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                  className="absolute right-2 text-xs text-ink-faint hover:text-ink transition"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              )}
+            </div>
 
             {isSignIn && (
               <div className="text-right">
