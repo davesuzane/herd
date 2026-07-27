@@ -1,4 +1,3 @@
-// src/components/AuthForm.tsx
 "use client";
 import { FormEvent, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -6,6 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import QuickAccountButton from "./QuickAccountButton";
 import CodeLoginForm from "./CodeLoginForm";
+
+// Helper function to generate a fallback username
+function generateRandomName() {
+  const adjectives = ["Anonymous", "Clever", "Swift", "Silent", "Brave", "Curious"];
+  const animals = ["Panda", "Otter", "Falcon", "Fox", "Wolf", "Lynx"];
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const animal = animals[Math.floor(Math.random() * animals.length)];
+  
+  return `${adj}${animal}${randomNum}`;
+}
 
 function getAuthErrorMessage(errorMessage: string) {
   const m = errorMessage.toLowerCase();
@@ -27,6 +38,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginMethod, setLoginMethod] = useState<"email" | "code">("email");
@@ -63,6 +75,9 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
       return;
     }
 
+    // Determine final name or generate one
+    const finalUsername = username.trim() ? username.trim() : generateRandomName();
+
     setLoading(true);
     try {
       const result = isSignIn
@@ -75,6 +90,10 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
             password,
             options: {
               emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
+              // Pass username into metadata for the DB trigger
+              data: {
+                username: finalUsername,
+              },
             },
           });
 
@@ -150,6 +169,18 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
           <CodeLoginForm />
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            {!isSignIn && (
+              <input
+                type="text"
+                placeholder="Username (optional)"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                disabled={loading}
+                className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition disabled:opacity-60"
+              />
+            )}
+
             <input
               type="email"
               placeholder="email"
