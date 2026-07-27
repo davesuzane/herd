@@ -115,7 +115,7 @@ export default function Nav() {
 
               <Link
                 href="/pro"
-                className="text-sm text-ink-dim hover:text-ink transition-colors"
+                className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
               >
                 Become pro
               </Link>
