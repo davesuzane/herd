@@ -81,15 +81,20 @@ export default function ChatClient({
     load();
 
     const channel = supabase
-      .channel(`messages-${thread.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `${thread.type === "channel" ? "channel_id" : "conversation_id"}=eq.${thread.id}`,
-        },
+  .channel(`messages-${thread.id}`)
+  .on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'chat_messages',
+    filter: `${thread.type === 'channel' ? 'channel_id' : 'conversation_id'}=eq.${thread.id}`,
+  }, (payload) => {
+    setMessages(prev => [...prev, payload.new as Message])
+  })
+  .on('postgres_changes', {
+    event: 'DELETE', schema: 'public', table: 'chat_messages',
+    filter: `${thread.type === 'channel' ? 'channel_id' : 'conversation_id'}=eq.${thread.id}`,
+  }, (payload) => {
+    setMessages(prev => prev.filter(m => m.id !== (payload.old as Message).id))
+  })
+  .subscribe(),
         async (payload) => {
           const newMessage = payload.new as Message;
           await ensureUsernames([newMessage.sender_id]);
@@ -122,7 +127,11 @@ export default function ChatClient({
     const container = messagesContainerRef.current;
     if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
-
+async function deleteMessage(messageId: string) {
+  if (!confirm('Delete this message?')) return
+  await supabase.from('chat_messages').delete().eq('id', messageId)
+  setMessages(prev => prev.filter(m => m.id !== messageId))
+}
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim() || !thread) return;
@@ -290,17 +299,22 @@ export default function ChatClient({
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
         >
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`text-sm flex items-start justify-between gap-2 group ${m.sender_id === currentUserId ? "text-tag" : "text-ink-dim"}`}
-            >
-              <div>
-                <span className="font-mono text-xs text-ink-faint mr-2">
-                  {new Date(m.created_at).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+          {messages.map(m => (
+  <div key={m.id} className={`text-sm flex items-start justify-between gap-2 group ${m.sender_id === currentUserId ? 'text-tag' : 'text-ink-dim'}`}>
+    <div>
+      <span className="font-mono text-xs text-ink-faint mr-2">
+        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+      {m.body}
+    </div>
+    {(m.sender_id === currentUserId || isAdmin) && (
+      <button onClick={() => deleteMessage(m.id)}
+        className="text-[10px] text-flag opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+        Delete
+      </button>
+    )}
+  </div>
+))}
                 </span>
                 <span className="font-mono text-xs mr-2 opacity-70">
                   {usernames[m.sender_id] ?? "…"}

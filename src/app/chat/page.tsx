@@ -26,6 +26,15 @@ export default async function ChatPage() {
     .order("name");
 
   let conversations: any[] = [];
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .single();
+    isAdmin = profile?.is_admin ?? false;
+  }
   if (user) {
     const { data: convos } = await supabase
       .from("dm_conversations")
@@ -53,11 +62,6 @@ export default async function ChatPage() {
   }
 
   return (
-    <ChatClient
-      channels={channels || []}
-      conversations={conversations}
-      currentUserId={user?.id ?? null}
-      isAdmin={isAdmin}
-    />
+   return <ChatClient channels={channels || []} conversations={conversations} currentUserId={user?.id ?? null} isAdmin={isAdmin} />
   );
 }
