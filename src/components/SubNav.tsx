@@ -26,7 +26,7 @@ export default function SubNav() {
         </Link>
         <Link
           href="/chat"
-          className="text-xs ml-auto font-mono text-ink-faint hover:text-ink-dim transition"
+          className="text-xs bg-black b-rounded ml-auto font-mono text-ink-faint hover:text-ink-dim transition"
         >
           Chat
         </Link>
