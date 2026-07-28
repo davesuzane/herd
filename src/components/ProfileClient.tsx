@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
+
 const EMOJI_PALETTE = [
   "👑",
   "🔥",
@@ -19,6 +20,8 @@ const EMOJI_PALETTE = [
   "🤝",
 ];
 
+type Profile = { id: string; username: string; avatar_url: string | null };
+type EmojiCount = { emoji: string; votes: number };
 type ApiSummary = {
   id: string;
   name: string;
@@ -170,6 +173,78 @@ export default function ProfileClient({
             ))}
           </div>
         </div>
+      )}
+
+      {(apis.length > 0 || methods.length > 0 || links.length > 0) && (
+        <div className="mt-10 pt-6 border-t border-line text-left space-y-6">
+          {apis.length > 0 && (
+            <div>
+              <p className="text-xs font-mono uppercase text-ink-faint mb-2">
+                APIs submitted
+              </p>
+              <div className="space-y-1">
+                {apis.map((api) => (
+                  <Link
+                    key={api.id}
+                    href={`/api/${api.id}`}
+                    className="flex items-center justify-between text-sm hover:text-tag transition"
+                  >
+                    <span className="font-mono">{api.name}</span>
+                    <span className="text-[10px] font-mono text-ink-faint uppercase">
+                      {api.pricing_type}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {methods.length > 0 && (
+            <div>
+              <p className="text-xs font-mono uppercase text-ink-faint mb-2">
+                Methods shared
+              </p>
+              <div className="space-y-1">
+                {methods.map((m) => (
+                  <Link
+                    key={m.id}
+                    href={`/methods/${m.id}`}
+                    className="block text-sm hover:text-methods transition"
+                  >
+                    {m.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {links.length > 0 && (
+            <div>
+              <p className="text-xs font-mono uppercase text-ink-faint mb-2">
+                Links dropped
+              </p>
+              <div className="space-y-1">
+                {links.map((l) => (
+                  <a
+                    key={l.id}
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-sm text-ink-dim hover:text-sites transition truncate"
+                  >
+                    {l.title || l.url}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {apis.length === 0 && methods.length === 0 && links.length === 0 && (
+        <p className="mt-10 pt-6 border-t border-line text-sm text-ink-faint">
+          Hasn't posted anything yet.
+        </p>
       )}
     </div>
   );
