@@ -24,6 +24,18 @@ export default function SubNav() {
         >
           Methods
         </Link>
+        <Link
+          href="/myparty"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          party
+        </Link>
+        <Link
+          href="/TruthDump"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          TruthDump
+        </Link>
       </div>
     </div>
   );
