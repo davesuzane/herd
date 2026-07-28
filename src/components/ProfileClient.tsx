@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-
+import Link from "next/link";
 const EMOJI_PALETTE = [
   "👑",
   "🔥",
@@ -19,19 +19,31 @@ const EMOJI_PALETTE = [
   "🤝",
 ];
 
-type Profile = { id: string; username: string; avatar_url: string | null };
-type EmojiCount = { emoji: string; votes: number };
+type ApiSummary = {
+  id: string;
+  name: string;
+  pricing_type: string;
+  scan_result: string;
+};
+type MethodSummary = { id: string; title: string };
+type LinkSummary = { id: string; url: string; title: string | null };
 
 export default function ProfileClient({
   profile,
   emojiSummary,
   myVote,
   currentUserId,
+  apis,
+  methods,
+  links,
 }: {
   profile: Profile;
   emojiSummary: EmojiCount[];
   myVote: string | null;
   currentUserId: string | null;
+  apis: ApiSummary[];
+  methods: MethodSummary[];
+  links: LinkSummary[];
 }) {
   const supabase = createClient();
   const router = useRouter();

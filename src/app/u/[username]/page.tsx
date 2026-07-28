@@ -32,6 +32,27 @@ export default async function ProfilePage({
     .eq("profile_id", profile.id)
     .order("votes", { ascending: false });
 
+  const { data: apis } = await supabase
+    .from("apis")
+    .select("id, name, pricing_type, scan_result")
+    .eq("submitted_by", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const { data: methods } = await supabase
+    .from("methods")
+    .select("id, title")
+    .eq("submitted_by", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const { data: links } = await supabase
+    .from("useful_links")
+    .select("id, url, title")
+    .eq("submitted_by", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   let myVote: string | null = null;
   if (user) {
     const { data: existing } = await supabase
@@ -49,6 +70,9 @@ export default async function ProfilePage({
       emojiSummary={emojiSummary || []}
       myVote={myVote}
       currentUserId={user?.id ?? null}
+      apis={apis || []}
+      methods={methods || []}
+      links={links || []}
     />
   );
 }

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
 
 type Channel = { id: string; name: string };
 type Conversation = { id: string; otherUsername: string };
@@ -306,9 +307,14 @@ export default function ChatClient({
                     minute: "2-digit",
                   })}
                 </span>
-                <span className="font-mono text-xs mr-2 opacity-70">
-                  {usernames[m.sender_id] ?? "…"}
-                </span>
+                {usernames[m.sender_id] && (
+                  <Link
+                    href={`/u/${usernames[m.sender_id]}`}
+                    className="font-mono text-xs mr-2 opacity-70 hover:opacity-100 hover:text-tag transition"
+                  >
+                    {usernames[m.sender_id]}
+                  </Link>
+                )}
                 {m.body}
               </div>
               {(m.sender_id === currentUserId || isAdmin) && (
