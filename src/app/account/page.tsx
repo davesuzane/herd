@@ -1,8 +1,7 @@
 // src/app/account/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
-
 export default function AccountPage() {
   const [email, setEmail] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
