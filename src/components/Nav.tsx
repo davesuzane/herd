@@ -1,45 +1,41 @@
+// src/components/Nav.tsx
 "use client";
-
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import AuthGateButton from "./AuthGateButton";
 
+type Profile = { username: string; is_pro: boolean; avatar_url: string | null };
+
 export default function Nav() {
   const supabase = createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username, is_pro, avatar_url")
-    .eq("id", user.id)
-    .single();
   const router = useRouter();
-  const [username, setUsername] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     async function load() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (user) {
-        const { data: profile } = await supabase
+        const { data } = await supabase
           .from("profiles")
-          .select("username")
+          .select("username, is_pro, avatar_url")
           .eq("id", user.id)
           .single();
 
-        setUsername(profile?.username ?? user.email ?? "you");
+        setProfile({
+          username: data?.username ?? user.email ?? "you",
+          is_pro: data?.is_pro ?? false,
+          avatar_url: data?.avatar_url ?? null,
+        });
       } else {
-        setUsername(null);
+        setProfile(null);
       }
     }
-
     load();
-
     const { data: sub } = supabase.auth.onAuthStateChange(() => load());
-
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -56,15 +52,15 @@ export default function Nav() {
           href="/"
           className="flex items-center gap-2 font-display font-bold text-xl"
         >
-          <Image
-            src="/apiherd-logo.png"
-            alt="Apiherd"
-            width={32}
-            height={32}
-            className="w-8 h-8 object-contain"
-            priority
-          />
-          apiherd
+          <svg viewBox="0 0 20 14" className="w-5 h-3.5" fill="none">
+            <path
+              d="M1 5.5C1 3 3 1 6 1H15C17.2 1 19 2.8 19 5V7L11 13L1 8V5.5Z"
+              stroke="#E3B23C"
+              strokeWidth="1.4"
+            />
+            <circle cx="5" cy="5" r="1.3" fill="#E3B23C" />
+          </svg>
+          Herd
         </Link>
 
         <div className="flex items-center gap-6">
@@ -75,13 +71,13 @@ export default function Nav() {
             Browse
           </Link>
 
-          {username ? (
+          {profile ? (
             <div className="flex items-center gap-4">
               <Link
-                href={`/u/${username}`}
-                className="flex items-center gap-2 text-sm font-mono text-ink-dim hidden sm:flex"
+                href={`/u/${profile.username}`}
+                className="flex items-center gap-2 text-sm font-mono text-ink-dim hidden sm:flex hover:text-ink transition-colors"
               >
-                {profile?.avatar_url ? (
+                {profile.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={profile.avatar_url}
@@ -89,19 +85,17 @@ export default function Nav() {
                     className="w-5 h-5 rounded-full object-cover"
                   />
                 ) : null}
-                {username}
+                {profile.username}
+                {profile.is_pro && (
+                  <span className="text-tag text-xs">★ Pro</span>
+                )}
               </Link>
-              <span className="text-sm font-mono text-ink-dim hidden sm:block">
-                {username}
-              </span>
-
               <button
                 onClick={signOut}
                 className="text-sm text-ink-faint hover:text-ink transition-colors"
               >
                 Sign out
               </button>
-
               <Link
                 href="/submit"
                 className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
@@ -117,27 +111,12 @@ export default function Nav() {
               >
                 Sign in
               </Link>
-
-              <Link
-                href="/signup"
-                className="text-sm text-ink-dim hover:text-ink transition-colors"
-              >
-                Sign up
-              </Link>
-
               <AuthGateButton
                 href="/submit"
                 className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
               >
                 Add an API
               </AuthGateButton>
-
-              <Link
-                href="/pro"
-                className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
-              >
-                Become pro
-              </Link>
             </>
           )}
         </div>
