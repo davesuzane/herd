@@ -107,7 +107,8 @@ export default function Dumpster() {
           <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-zinc-300">
             Soon you'll be able to submit online claims for review, upload
             supporting evidence, report local infrastructure problems, suggest
-            additional context, and help others verify information together.
+            additional context, and help others verify information
+            together(anonymously).
           </p>
 
           <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
