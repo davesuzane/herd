@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 type Channel = { id: string; name: string };
@@ -36,11 +37,17 @@ export default function ChatClient({
       : null,
   );
   const [messages, setMessages] = useState<Message[]>([]);
+  const searchParams = useSearchParams();
   const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
   const [newDmUsername, setNewDmUsername] = useState("");
   const [dmError, setDmError] = useState("");
-
+  useEffect(() => {
+    const dmTarget = searchParams.get("dm");
+    if (dmTarget && currentUserId) {
+      startDmWithUsername(dmTarget);
+    }
+  }, [currentUserId]);
   async function ensureUsernames(senderIds: string[]) {
     const missing = [...new Set(senderIds)].filter((id) => !usernames[id]);
     if (missing.length === 0) return;
@@ -149,15 +156,12 @@ export default function ChatClient({
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
   }
 
-  async function startDm(e: React.FormEvent) {
-    e.preventDefault();
+  async function startDmWithUsername(username: string) {
     setDmError("");
     if (!currentUserId) {
-      router.push("/login?redirect=/chat");
+      router.push(`/login?redirect=/chat?dm=${username}`);
       return;
     }
-
-    const username = newDmUsername.trim();
     if (!username) return;
 
     const { data: targetProfile } = await supabase
@@ -165,7 +169,6 @@ export default function ChatClient({
       .select("id, username")
       .eq("username", username)
       .maybeSingle();
-
     if (!targetProfile) {
       setDmError("No user with that username.");
       return;
@@ -191,7 +194,6 @@ export default function ChatClient({
         .insert({ user_a: userA, user_b: userB })
         .select()
         .single();
-
       if (error) {
         setDmError(error.message);
         return;
@@ -211,6 +213,10 @@ export default function ChatClient({
     setNewDmUsername("");
   }
 
+  async function startDm(e: React.FormEvent) {
+    e.preventDefault();
+    await startDmWithUsername(newDmUsername.trim());
+  }
   return (
     <div className="max-w-5xl mx-auto px-6 pt-12 pb-24 grid md:grid-cols-[220px_1fr] gap-6">
       <aside className="space-y-6">

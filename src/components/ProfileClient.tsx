@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import ProfileShare from "./ProfileShare";
 import Link from "next/link";
 
 const EMOJI_PALETTE = [
@@ -39,6 +40,8 @@ export default function ProfileClient({
   apis,
   methods,
   links,
+  isAdded,
+  addedByCount,
 }: {
   profile: Profile;
   emojiSummary: EmojiCount[];
@@ -47,10 +50,40 @@ export default function ProfileClient({
   apis: ApiSummary[];
   methods: MethodSummary[];
   links: LinkSummary[];
+  isAdded: boolean;
+  addedByCount: number;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(myVote);
+  const [added, setAdded] = useState(isAdded);
+  const [addedCount, setAddedCount] = useState(addedByCount);
+
+  async function toggleAdd() {
+    if (!currentUserId) {
+      router.push(`/login?redirect=/u/${profile.username}`);
+      return;
+    }
+    if (isSelf) return;
+
+    if (added) {
+      await supabase
+        .from("connections")
+        .delete()
+        .eq("owner_id", currentUserId)
+        .eq("added_id", profile.id);
+      setAdded(false);
+      setAddedCount((c) => Math.max(0, c - 1));
+    } else {
+      const { error } = await supabase
+        .from("connections")
+        .insert({ owner_id: currentUserId, added_id: profile.id });
+      if (!error) {
+        setAdded(true);
+        setAddedCount((c) => c + 1);
+      }
+    }
+  }
   const [customEmoji, setCustomEmoji] = useState("");
 
   const isSelf = currentUserId === profile.id;
@@ -105,6 +138,30 @@ export default function ProfileClient({
         <p className="text-sm text-ink-faint mb-8">
           Recognized as {topEmoji.emoji} by {topEmoji.votes} people
         </p>
+      )}
+      <p className="text-xs text-ink-faint mb-6">
+        Added by {addedCount} people
+      </p>
+
+      {!isSelf && (
+        <div className="flex gap-2 justify-center mb-8">
+          <button
+            onClick={toggleAdd}
+            className={`text-xs font-mono px-4 py-2 rounded-full border transition ${
+              added
+                ? "border-tag text-tag bg-tag/10"
+                : "border-line text-ink-dim hover:border-ink-faint"
+            }`}
+          >
+            {added ? "Added ✓" : "Add this people"}
+          </button>
+          <a
+            href={`/chat?dm=${profile.username}`}
+            className="text-xs font-mono px-4 py-2 rounded-full border border-line text-ink-dim hover:border-ink-faint transition"
+          >
+            Message
+          </a>
+        </div>
       )}
       {!topEmoji && <p className="text-sm text-ink-faint mb-8">No votes yet</p>}
 
@@ -246,6 +303,9 @@ export default function ProfileClient({
           Hasn't posted anything yet.
         </p>
       )}
+      <div className="mt-10">
+        <ProfileShare username={profile.username} />
+      </div>
     </div>
   );
 }
