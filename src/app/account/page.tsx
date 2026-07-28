@@ -5,10 +5,44 @@ import { createClient } from "@/utils/supabase/client";
 
 export default function AccountPage() {
   const [email, setEmail] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const supabase = createClient();
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    setAvatarError("");
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const filePath = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file);
+
+    if (uploadError) {
+      setAvatarError(uploadError.message);
+      setAvatarUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+    await supabase
+      .from("profiles")
+      .update({ avatar_url: urlData.publicUrl })
+      .eq("id", user.id);
+
+    setAvatarUploading(false);
+    window.location.reload();
+  }
   async function handleAddEmail(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -38,9 +72,27 @@ export default function AccountPage() {
           Keeps your account recoverable even if you lose your code.
         </p>
         <form onSubmit={handleAddEmail} className="space-y-3">
+          <div className="bg-surface border border-line rounded-xl p-8 mb-4">
+            <h2 className="font-display font-bold text-lg mb-3">
+              Profile picture
+            </h2>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              disabled={avatarUploading}
+              className="text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-2 file:text-ink-dim file:text-xs"
+            />
+            {avatarUploading && (
+              <p className="text-xs text-ink-faint mt-2">Uploading…</p>
+            )}
+            {avatarError && (
+              <p className="text-xs text-flag mt-2">{avatarError}</p>
+            )}
+          </div>
           <input
             type="email"
-            placeholder="soneca@nenem.com"
+            placeholder="email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition"

@@ -9,6 +9,11 @@ import AuthGateButton from "./AuthGateButton";
 
 export default function Nav() {
   const supabase = createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("username, is_pro, avatar_url")
+    .eq("id", user.id)
+    .single();
   const router = useRouter();
   const [username, setUsername] = useState<string | null>(null);
 
@@ -72,6 +77,20 @@ export default function Nav() {
 
           {username ? (
             <div className="flex items-center gap-4">
+              <Link
+                href={`/u/${username}`}
+                className="flex items-center gap-2 text-sm font-mono text-ink-dim hidden sm:flex"
+              >
+                {profile?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatar_url}
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover"
+                  />
+                ) : null}
+                {username}
+              </Link>
               <span className="text-sm font-mono text-ink-dim hidden sm:block">
                 {username}
               </span>
