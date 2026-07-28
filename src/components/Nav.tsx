@@ -90,6 +90,12 @@ export default function Nav() {
                   <span className="text-tag text-xs">★ Pro</span>
                 )}
               </Link>
+              <Link
+                href="/connections"
+                className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
+              >
+                Your people
+              </Link>
               <button
                 onClick={signOut}
                 className="text-sm text-ink-faint hover:text-ink transition-colors"
