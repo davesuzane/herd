@@ -6,7 +6,7 @@ export default function SubNav() {
   return (
     <div className="border-b border-line bg-bg-alt">
       <div className="max-w-5xl mx-auto px-6 h-10 flex items-center justify-between w-full">
-        <div className="flex items-center gap-6">
+      >
           <Link
             href="/leaked"
             className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
@@ -24,18 +24,7 @@ export default function SubNav() {
             className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
           >
             Methods
-          </Link>
-        </div>
-
-        {/* Set explicit width matching the button + center Chat inside it */}
-        <div className="w-[114px] flex justify-center items-center">
-          <Link
-            href="/chat"
-            className="text-xs bg-black rounded-lg px-3 py-1 font-mono text-ink-faint hover:text-ink-dim transition"
-          >
-            Chat
-          </Link>
-        </div>
+          </Link> 
       </div>
     </div>
   );
