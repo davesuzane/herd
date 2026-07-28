@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import SubNav from "@/components/SubNav";
 import FloatingChatButton from "@/components/FloatingChatButton";
+import PresenceProvider from "@/components/PresenceProvider";
 
 const zilla = Zilla_Slab({
   subsets: ["latin"],
@@ -40,12 +41,14 @@ export default function RootLayout({
       className={`${zilla.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
       <body className="font-body min-h-screen flex flex-col">
-        <Analytics />
-        <FloatingChatButton />
-        <Nav />
-        <SubNav />
-        <div className="flex-1">{children}</div>
-        <Footer />
+        <PresenceProvider>
+          <Analytics />
+          <FloatingChatButton />
+          <Nav />
+          <SubNav />
+          <div className="flex-1">{children}</div>
+          <Footer />
+        </PresenceProvider>
       </body>
     </html>
   );

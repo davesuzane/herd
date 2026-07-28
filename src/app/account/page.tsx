@@ -9,6 +9,31 @@ export default function AccountPage() {
   const [avatarError, setAvatarError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showStatus, setShowStatus] = useState(true);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("show_online_status")
+        .eq("id", data.user.id)
+        .single();
+      setShowStatus(profile?.show_online_status ?? true);
+    });
+  }, []);
+  async function toggleStatus() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const next = !showStatus;
+    await supabase
+      .from("profiles")
+      .update({ show_online_status: next })
+      .eq("id", user.id);
+    setShowStatus(next);
+    window.location.reload(); // simplest way to re-run the presence provider with the new setting
+  }
   const supabase = createClient();
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -67,6 +92,24 @@ export default function AccountPage() {
   return (
     <div className="max-w-sm mx-auto mt-24 px-6">
       <div className="bg-surface border border-line rounded-xl p-8">
+        <div className="bg-surface border border-line rounded-xl p-8 mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-display font-bold text-lg">Online status</h2>
+            <p className="text-xs text-ink-faint mt-1">
+              Let others see when you're active
+            </p>
+          </div>
+          <button
+            onClick={toggleStatus}
+            className={`text-xs font-mono px-4 py-2 rounded-full border transition ${
+              showStatus
+                ? "border-safe-dim text-safe"
+                : "border-line text-ink-faint"
+            }`}
+          >
+            {showStatus ? "Visible" : "Hidden"}
+          </button>
+        </div>
         <h1 className="font-display font-bold text-2xl mb-1">Add an email</h1>
         <p className="text-sm text-ink-faint mb-6">
           Keeps your account recoverable even if you lose your code.

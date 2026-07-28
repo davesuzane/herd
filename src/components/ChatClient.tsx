@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 type Channel = { id: string; name: string };
@@ -29,6 +28,7 @@ export default function ChatClient({
   const supabase = createClient();
   const router = useRouter();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
 
   const [convos, setConvos] = useState(conversations);
   const [thread, setThread] = useState<Thread | null>(
@@ -37,17 +37,122 @@ export default function ChatClient({
       : null,
   );
   const [messages, setMessages] = useState<Message[]>([]);
-  const searchParams = useSearchParams();
   const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
+  const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
   const [newDmUsername, setNewDmUsername] = useState("");
   const [dmError, setDmError] = useState("");
+
+  async function startDmWithUsername(username: string) {
+    setDmError("");
+    if (!currentUserId) {
+      router.push(`/login?redirect=/chat?dm=${username}`);
+      return;
+    }
+    if (!username) return;
+
+    const { data: targetProfile } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .eq("username", username)
+      .maybeSingle();
+    if (!targetProfile) {
+      setDmError("No user with that username.");
+      return;
+    }
+    if (targetProfile.id === currentUserId) {
+      setDmError("That's you.");
+      return;
+    }
+
+    const [userA, userB] = [currentUserId, targetProfile.id].sort();
+
+    const { data: existing } = await supabase
+      .from("dm_conversations")
+      .select("id")
+      .eq("user_a", userA)
+      .eq("user_b", userB)
+      .maybeSingle();
+
+    let conversationId = existing?.id;
+    if (!conversationId) {
+      const { data: created, error } = await supabase
+        .from("dm_conversations")
+        .insert({ user_a: userA, user_b: userB })
+        .select()
+        .single();
+      if (error) {
+        setDmError(error.message);
+        return;
+      }
+      conversationId = created.id;
+      setConvos((prev) => [
+        ...prev,
+        { id: conversationId!, otherUsername: targetProfile.username },
+      ]);
+    }
+
+    setThread({
+      type: "dm",
+      id: conversationId!,
+      label: `@${targetProfile.username}`,
+    });
+    setNewDmUsername("");
+  }
+
   useEffect(() => {
     const dmTarget = searchParams.get("dm");
     if (dmTarget && currentUserId) {
       startDmWithUsername(dmTarget);
     }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (!thread || thread.type !== "dm" || !currentUserId) return;
+    let cancelled = false;
+
+    async function markRead() {
+      await supabase.from("dm_read_state").upsert(
+        {
+          conversation_id: thread!.id,
+          user_id: currentUserId,
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: "conversation_id,user_id" },
+      );
+    }
+    markRead();
+
+    async function loadOtherReadAt() {
+      const { data } = await supabase
+        .from("dm_read_state")
+        .select("user_id, last_read_at")
+        .eq("conversation_id", thread!.id);
+      const other = data?.find((r) => r.user_id !== currentUserId);
+      if (!cancelled) setOtherReadAt(other?.last_read_at ?? null);
+    }
+    loadOtherReadAt();
+
+    const readChannel = supabase
+      .channel(`read-${thread.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "dm_read_state",
+          filter: `conversation_id=eq.${thread.id}`,
+        },
+        () => loadOtherReadAt(),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(readChannel);
+    };
+  }, [thread?.id, currentUserId]);
+
   async function ensureUsernames(senderIds: string[]) {
     const missing = [...new Set(senderIds)].filter((id) => !usernames[id]);
     if (missing.length === 0) return;
@@ -156,67 +261,11 @@ export default function ChatClient({
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
   }
 
-  async function startDmWithUsername(username: string) {
-    setDmError("");
-    if (!currentUserId) {
-      router.push(`/login?redirect=/chat?dm=${username}`);
-      return;
-    }
-    if (!username) return;
-
-    const { data: targetProfile } = await supabase
-      .from("profiles")
-      .select("id, username")
-      .eq("username", username)
-      .maybeSingle();
-    if (!targetProfile) {
-      setDmError("No user with that username.");
-      return;
-    }
-    if (targetProfile.id === currentUserId) {
-      setDmError("That's you.");
-      return;
-    }
-
-    const [userA, userB] = [currentUserId, targetProfile.id].sort();
-
-    const { data: existing } = await supabase
-      .from("dm_conversations")
-      .select("id")
-      .eq("user_a", userA)
-      .eq("user_b", userB)
-      .maybeSingle();
-
-    let conversationId = existing?.id;
-    if (!conversationId) {
-      const { data: created, error } = await supabase
-        .from("dm_conversations")
-        .insert({ user_a: userA, user_b: userB })
-        .select()
-        .single();
-      if (error) {
-        setDmError(error.message);
-        return;
-      }
-      conversationId = created.id;
-      setConvos((prev) => [
-        ...prev,
-        { id: conversationId!, otherUsername: targetProfile.username },
-      ]);
-    }
-
-    setThread({
-      type: "dm",
-      id: conversationId!,
-      label: `@${targetProfile.username}`,
-    });
-    setNewDmUsername("");
-  }
-
   async function startDm(e: React.FormEvent) {
     e.preventDefault();
     await startDmWithUsername(newDmUsername.trim());
   }
+
   return (
     <div className="max-w-5xl mx-auto px-6 pt-12 pb-24 grid md:grid-cols-[220px_1fr] gap-6">
       <aside className="space-y-6">
@@ -300,37 +349,45 @@ export default function ChatClient({
           className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
         >
           {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`text-sm flex items-start justify-between gap-2 group ${
-                m.sender_id === currentUserId ? "text-tag" : "text-ink-dim"
-              }`}
-            >
-              <div>
-                <span className="font-mono text-xs text-ink-faint mr-2">
-                  {new Date(m.created_at).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                {usernames[m.sender_id] && (
-                  <Link
-                    href={`/u/${usernames[m.sender_id]}`}
-                    className="font-mono text-xs mr-2 opacity-70 hover:opacity-100 hover:text-tag transition"
+            <div key={m.id}>
+              <div
+                className={`text-sm flex items-start justify-between gap-2 group ${
+                  m.sender_id === currentUserId ? "text-tag" : "text-ink-dim"
+                }`}
+              >
+                <div>
+                  <span className="font-mono text-xs text-ink-faint mr-2">
+                    {new Date(m.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {usernames[m.sender_id] && (
+                    <Link
+                      href={`/u/${usernames[m.sender_id]}`}
+                      className="font-mono text-xs mr-2 opacity-70 hover:opacity-100 hover:text-tag transition"
+                    >
+                      {usernames[m.sender_id]}
+                    </Link>
+                  )}
+                  {m.body}
+                </div>
+                {(m.sender_id === currentUserId || isAdmin) && (
+                  <button
+                    onClick={() => deleteMessage(m.id)}
+                    className="text-[10px] text-flag opacity-0 group-hover:opacity-100 transition flex-shrink-0"
                   >
-                    {usernames[m.sender_id]}
-                  </Link>
+                    Delete
+                  </button>
                 )}
-                {m.body}
               </div>
-              {(m.sender_id === currentUserId || isAdmin) && (
-                <button
-                  onClick={() => deleteMessage(m.id)}
-                  className="text-[10px] text-flag opacity-0 group-hover:opacity-100 transition flex-shrink-0"
-                >
-                  Delete
-                </button>
-              )}
+
+              {m.sender_id === currentUserId &&
+                thread?.type === "dm" &&
+                otherReadAt &&
+                new Date(otherReadAt) >= new Date(m.created_at) && (
+                  <div className="text-[10px] text-ink-faint mt-0.5">Seen</div>
+                )}
             </div>
           ))}
         </div>
