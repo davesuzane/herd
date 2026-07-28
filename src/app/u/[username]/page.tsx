@@ -9,25 +9,13 @@ export default async function ProfilePage({
 }) {
   const { username } = await params;
   const supabase = await createClient();
-// add alongside your other queries in the same file:
-let isAdded = false
-let addedByCount = 0
 
-const { data: countRow } = await supabase.from('connection_counts').select('added_by_count').eq('added_id', profile.id).maybeSingle()
-addedByCount = countRow?.added_by_count ?? 0
-
-if (user) {
-  const { data: existingConnection } = await supabase
-    .from('connections')
-    .select('id')
-    .eq('owner_id', user.id)
-    .eq('added_id', profile.id)
-    .maybeSingle()
-  isAdded = !!existingConnection
-}
+  // 1. Fetch authenticated user first
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // 2. Fetch profile next
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
@@ -41,6 +29,30 @@ if (user) {
       </div>
     );
 
+  // 3. Now it is safe to use profile.id and user.id
+  let isAdded = false;
+  let addedByCount = 0;
+
+  const { data: countRow } = await supabase
+    .from("connection_counts")
+    .select("added_by_count")
+    .eq("added_id", profile.id)
+    .maybeSingle();
+
+  addedByCount = countRow?.added_by_count ?? 0;
+
+  if (user) {
+    const { data: existingConnection } = await supabase
+      .from("connections")
+      .select("id")
+      .eq("owner_id", user.id)
+      .eq("added_id", profile.id)
+      .maybeSingle();
+
+    isAdded = !!existingConnection;
+  }
+
+  // 4. Remaining database queries
   const { data: emojiSummary } = await supabase
     .from("profile_emoji_summary")
     .select("*")
@@ -76,20 +88,21 @@ if (user) {
       .eq("profile_id", profile.id)
       .eq("voter_id", user.id)
       .maybeSingle();
+
     myVote = existing?.emoji ?? null;
   }
 
- return (
-  <ProfileClient
-    profile={profile}
-    emojiSummary={emojiSummary || []}
-    myVote={myVote}
-    currentUserId={user?.id ?? null}
-    apis={apis || []}
-    methods={methods || []}
-    links={links || []}
-    isAdded={isAdded}
-    addedByCount={addedByCount}
-  />
-)
+  return (
+    <ProfileClient
+      profile={profile}
+      emojiSummary={emojiSummary || []}
+      myVote={myVote}
+      currentUserId={user?.id ?? null}
+      apis={apis || []}
+      methods={methods || []}
+      links={links || []}
+      isAdded={isAdded}
+      addedByCount={addedByCount}
+    />
+  );
 }
