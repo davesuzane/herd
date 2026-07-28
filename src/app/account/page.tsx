@@ -8,7 +8,24 @@ export default function AccountPage() {
   const [avatarError, setAvatarError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
   const [showStatus, setShowStatus] = useState(true);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, bio")
+        .eq("id", data.user.id)
+        .single();
+      setUsername(profile?.username ?? "");
+      setBio(profile?.bio ?? "");
+    });
+  }, []);
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
@@ -20,6 +37,39 @@ export default function AccountPage() {
       setShowStatus(profile?.show_online_status ?? true);
     });
   }, []);
+  async function handleProfileSave(e: React.FormEvent) {
+    e.preventDefault();
+    setProfileError("");
+    setProfileMessage("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const cleanUsername = username.trim().toLowerCase();
+    if (cleanUsername.length < 3) {
+      setProfileError("Username needs to be at least 3 characters.");
+      return;
+    }
+
+    setProfileSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ username: cleanUsername, bio })
+      .eq("id", user.id);
+    setProfileSaving(false);
+
+    if (error) {
+      setProfileError(
+        error.message.includes("duplicate")
+          ? "That username is taken."
+          : error.message,
+      );
+      return;
+    }
+    setProfileMessage("Saved.");
+  }
   async function toggleStatus() {
     const {
       data: { user },
@@ -113,6 +163,38 @@ export default function AccountPage() {
         <p className="text-sm text-ink-faint mb-6">
           Keeps your account recoverable even if you lose your code.
         </p>
+        <div className="bg-surface border border-line rounded-xl p-8 mb-4">
+          <h2 className="font-display font-bold text-lg mb-3">Edit profile</h2>
+          <form onSubmit={handleProfileSave} className="space-y-3">
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="username"
+              className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition"
+            />
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="A short bio"
+              rows={3}
+              maxLength={200}
+              className="w-full bg-bg-alt border border-line rounded px-3 py-2.5 text-sm focus:outline-none focus:border-ink-faint transition"
+            />
+            {profileError && (
+              <p className="text-flag text-xs">{profileError}</p>
+            )}
+            {profileMessage && (
+              <p className="text-tag text-xs">{profileMessage}</p>
+            )}
+            <button
+              type="submit"
+              disabled={profileSaving}
+              className="w-full bg-tag text-[#1a2015] font-semibold py-2.5 rounded hover:brightness-110 transition disabled:opacity-60"
+            >
+              {profileSaving ? "Saving…" : "Save profile"}
+            </button>
+          </form>
+        </div>
         <form onSubmit={handleAddEmail} className="space-y-3">
           <div className="bg-surface border border-line rounded-xl p-8 mb-4">
             <h2 className="font-display font-bold text-lg mb-3">

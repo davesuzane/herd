@@ -32,6 +32,8 @@ type ApiSummary = {
 type MethodSummary = { id: string; title: string };
 type LinkSummary = { id: string; url: string; title: string | null };
 
+type Photo = { id: string; image_url: string };
+
 export default function ProfileClient({
   profile,
   emojiSummary,
@@ -42,6 +44,10 @@ export default function ProfileClient({
   links,
   isAdded,
   addedByCount,
+  followingCount,
+  followerCount,
+  friendCount,
+  photos,
 }: {
   profile: Profile;
   emojiSummary: EmojiCount[];
@@ -52,13 +58,47 @@ export default function ProfileClient({
   links: LinkSummary[];
   isAdded: boolean;
   addedByCount: number;
+  followingCount: number;
+  followerCount: number;
+  friendCount: number;
+  photos: Photo[];
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(myVote);
   const [added, setAdded] = useState(isAdded);
   const [addedCount, setAddedCount] = useState(addedByCount);
+  const [galleryPhotos, setGalleryPhotos] = useState(photos);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !currentUserId) return;
+    setUploadingPhoto(true);
+
+    const filePath = `${currentUserId}/gallery-${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file);
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+      const { data: created } = await supabase
+        .from("profile_photos")
+        .insert({ profile_id: currentUserId, image_url: urlData.publicUrl })
+        .select()
+        .single();
+      if (created) setGalleryPhotos((prev) => [created, ...prev]);
+    }
+    setUploadingPhoto(false);
+  }
+
+  async function deletePhoto(photoId: string) {
+    await supabase.from("profile_photos").delete().eq("id", photoId);
+    setGalleryPhotos((prev) => prev.filter((p) => p.id !== photoId));
+  }
   async function toggleAdd() {
     if (!currentUserId) {
       router.push(`/login?redirect=/u/${profile.username}`);
@@ -134,6 +174,17 @@ export default function ProfileClient({
       <h1 className="font-display font-bold text-2xl mb-1">
         @{profile.username}
       </h1>
+      <div className="flex justify-center gap-6 text-xs font-mono text-ink-faint mb-4">
+        <span>
+          <span className="text-ink">{followingCount}</span> following
+        </span>
+        <span>
+          <span className="text-ink">{followerCount}</span> followers
+        </span>
+        <span>
+          <span className="text-ink">{friendCount}</span> friends
+        </span>
+      </div>
       {topEmoji && (
         <p className="text-sm text-ink-faint mb-8">
           Recognized as {topEmoji.emoji} by {topEmoji.votes} people
@@ -255,7 +306,48 @@ export default function ProfileClient({
               </div>
             </div>
           )}
-
+          <div className="mt-10 pt-6 border-t border-line">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-mono uppercase text-ink-faint">
+                Photos
+              </p>
+              {isSelf && (
+                <label className="text-[10px] font-mono text-tag hover:brightness-110 transition cursor-pointer">
+                  {uploadingPhoto ? "Uploading…" : "+ Add photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={uploadingPhoto}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {galleryPhotos.map((p) => (
+                <div key={p.id} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.image_url}
+                    alt=""
+                    className="w-full aspect-square object-cover rounded-lg border border-line"
+                  />
+                  {isSelf && (
+                    <button
+                      onClick={() => deletePhoto(p.id)}
+                      className="absolute top-1 right-1 text-[10px] bg-bg/80 text-flag px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {galleryPhotos.length === 0 && (
+              <p className="text-sm text-ink-faint">No photos yet.</p>
+            )}
+          </div>
           {methods.length > 0 && (
             <div>
               <p className="text-xs font-mono uppercase text-ink-faint mb-2">

@@ -91,7 +91,27 @@ export default async function ProfilePage({
 
     myVote = existing?.emoji ?? null;
   }
+  const { data: followingRow } = await supabase
+    .from("following_counts")
+    .select("following_count")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  const { data: followerRow } = await supabase
+    .from("follower_counts")
+    .select("follower_count")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  const { data: friendRow } = await supabase
+    .from("friend_counts")
+    .select("friend_count")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
 
+  const { data: photos } = await supabase
+    .from("profile_photos")
+    .select("id, image_url")
+    .eq("profile_id", profile.id)
+    .order("created_at", { ascending: false });
   return (
     <ProfileClient
       profile={profile}
@@ -103,6 +123,10 @@ export default async function ProfilePage({
       links={links || []}
       isAdded={isAdded}
       addedByCount={addedByCount}
+      followingCount={followingRow?.following_count ?? 0}
+      followerCount={followerRow?.follower_count ?? 0}
+      friendCount={friendRow?.friend_count ?? 0}
+      photos={photos || []}
     />
   );
 }
