@@ -42,7 +42,7 @@ type Photo = { id: string; image_url: string };
 type Story = {
   id: string;
   media_url: string;
-  media_type: string;
+  media_type: "image" | "video";
 };
 
 export default function ProfileClient({
