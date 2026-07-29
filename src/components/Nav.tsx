@@ -1,10 +1,12 @@
 // src/components/Nav.tsx
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import AuthGateButton from "./AuthGateButton";
+import { Settings } from 'lucide-react';
 
 type Profile = { username: string; is_pro: boolean; avatar_url: string | null };
 
@@ -93,7 +95,7 @@ export default function Nav() {
                 href="/account"
                 className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
               >
-                settings
+                <Settings/>
               </Link>
               <button
                 onClick={signOut}
