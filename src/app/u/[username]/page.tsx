@@ -9,7 +9,12 @@ export default async function ProfilePage({
 }) {
   const { username } = await params;
   const supabase = await createClient();
-
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  const { data: stories } = await supabase
+    .from("stories")
+    .select("id, media_url, media_type")
+    .eq("profile_id", profile.id)
+    .order("created_at", { ascending: false });
   // 1. Fetch authenticated user first
   const {
     data: { user },

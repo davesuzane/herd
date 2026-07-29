@@ -21,7 +21,12 @@ const EMOJI_PALETTE = [
   "🤝",
 ];
 
-type Profile = { id: string; username: string; avatar_url: string | null };
+type Profile = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  bio: string | null;
+};
 type EmojiCount = { emoji: string; votes: number };
 type ApiSummary = {
   id: string;
@@ -174,6 +179,9 @@ export default function ProfileClient({
       <h1 className="font-display font-bold text-2xl mb-1">
         @{profile.username}
       </h1>
+      {profile.bio && (
+        <p className="text-sm text-ink-dim mb-4">{profile.bio}</p>
+      )}
       <div className="flex justify-center gap-6 text-xs font-mono text-ink-faint mb-4">
         <span>
           <span className="text-ink">{followingCount}</span> following
@@ -306,6 +314,7 @@ export default function ProfileClient({
               </div>
             </div>
           )}
+
           <div className="mt-10 pt-6 border-t border-line">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-mono uppercase text-ink-faint">
