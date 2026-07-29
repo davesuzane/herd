@@ -64,15 +64,14 @@ export default function Nav() {
         </Link>
 
         <div className="flex items-center gap-6">
-          <Link
-            href="/#browse"
-            className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
-          >
-            Browse
-          </Link>
-
           {profile ? (
             <div className="flex items-center gap-4">
+              <Link
+                href="/connections"
+                className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
+              >
+                Your people
+              </Link>
               <Link
                 href={`/u/${profile.username}`}
                 className="flex items-center gap-2 text-sm font-mono text-ink-dim hidden sm:flex hover:text-ink transition-colors"
@@ -91,10 +90,10 @@ export default function Nav() {
                 )}
               </Link>
               <Link
-                href="/connections"
+                href="/account"
                 className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
               >
-                Your people
+                settings
               </Link>
               <button
                 onClick={signOut}
