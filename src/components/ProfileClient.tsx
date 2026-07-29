@@ -38,6 +38,11 @@ type MethodSummary = { id: string; title: string };
 type LinkSummary = { id: string; url: string; title: string | null };
 
 type Photo = { id: string; image_url: string };
+type Story = {
+  id: string;
+  media_url: string;
+  media_type: string;
+};
 
 export default function ProfileClient({
   profile,
@@ -53,6 +58,7 @@ export default function ProfileClient({
   followerCount,
   friendCount,
   photos,
+stories,
 }: {
   profile: Profile;
   emojiSummary: EmojiCount[];
@@ -67,6 +73,7 @@ export default function ProfileClient({
   followerCount: number;
   friendCount: number;
   photos: Photo[];
+stories: Story[];
 }) {
   const supabase = createClient();
   const router = useRouter();
