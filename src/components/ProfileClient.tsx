@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import ProfileShare from "./ProfileShare";
+import StoriesGallery from "./StoriesGallery";
 import Link from "next/link";
 
 const EMOJI_PALETTE = [
@@ -176,6 +177,11 @@ export default function ProfileClient({
             {profile.username[0]?.toUpperCase()}
           </div>
         )}
+        <StoriesGallery
+          profileId={profile.id}
+          initialStories={stories || []}
+          isSelf={user?.id === profile.id}
+        />
         {topEmoji && (
           <span className="absolute -bottom-1 -right-1 text-3xl bg-bg rounded-full">
             {topEmoji.emoji}

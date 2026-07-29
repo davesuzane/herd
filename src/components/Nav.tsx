@@ -106,7 +106,7 @@ export default function Nav() {
               </Link>
               <button
                 onClick={signOut}
-                className="text-sm bg-red text-ink-faint hover:text-ink transition-colors"
+                className="bg-red font-semibold px-4 py-2 rounded hover:brightness-110 transition"
               >
                 <LogOut />
               </button>
