@@ -58,7 +58,7 @@ export default function ProfileClient({
   followerCount,
   friendCount,
   photos,
-stories,
+  stories,
 }: {
   profile: Profile;
   emojiSummary: EmojiCount[];
@@ -73,7 +73,7 @@ stories,
   followerCount: number;
   friendCount: number;
   photos: Photo[];
-stories: Story[];
+  stories: Story[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -297,7 +297,46 @@ stories: Story[];
           </div>
         </div>
       )}
-
+      <div className="mt-10 pt-6 border-t border-line">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-mono uppercase text-ink-faint">Photos</p>
+          {isSelf && (
+            <label className="text-[10px] font-mono text-tag hover:brightness-110 transition cursor-pointer">
+              {uploadingPhoto ? "Uploading…" : "+ Add photo"}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                disabled={uploadingPhoto}
+                className="hidden"
+              />
+            </label>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {galleryPhotos.map((p) => (
+            <div key={p.id} className="relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.image_url}
+                alt=""
+                className="w-full aspect-square object-cover rounded-lg border border-line"
+              />
+              {isSelf && (
+                <button
+                  onClick={() => deletePhoto(p.id)}
+                  className="absolute top-1 right-1 text-[10px] bg-bg/80 text-flag px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {galleryPhotos.length === 0 && (
+          <p className="text-sm text-ink-faint">No photos yet.</p>
+        )}
+      </div>
       {(apis.length > 0 || methods.length > 0 || links.length > 0) && (
         <div className="mt-10 pt-6 border-t border-line text-left space-y-6">
           {apis.length > 0 && (
@@ -322,48 +361,6 @@ stories: Story[];
             </div>
           )}
 
-          <div className="mt-10 pt-6 border-t border-line">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-mono uppercase text-ink-faint">
-                Photos
-              </p>
-              {isSelf && (
-                <label className="text-[10px] font-mono text-tag hover:brightness-110 transition cursor-pointer">
-                  {uploadingPhoto ? "Uploading…" : "+ Add photo"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    disabled={uploadingPhoto}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {galleryPhotos.map((p) => (
-                <div key={p.id} className="relative group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.image_url}
-                    alt=""
-                    className="w-full aspect-square object-cover rounded-lg border border-line"
-                  />
-                  {isSelf && (
-                    <button
-                      onClick={() => deletePhoto(p.id)}
-                      className="absolute top-1 right-1 text-[10px] bg-bg/80 text-flag px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {galleryPhotos.length === 0 && (
-              <p className="text-sm text-ink-faint">No photos yet.</p>
-            )}
-          </div>
           {methods.length > 0 && (
             <div>
               <p className="text-xs font-mono uppercase text-ink-faint mb-2">
