@@ -36,6 +36,12 @@ export default function SubNav() {
         >
           TruthDump
         </Link>
+        <Link
+          href="#"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          herdis
+        </Link>
       </div>
     </div>
   );
