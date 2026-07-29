@@ -2,11 +2,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AuthGateButton from "./AuthGateButton";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import AuthGateButton from "./AuthGateButton";
-import { Settings } from 'lucide-react';
+import { Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 type Profile = { username: string; is_pro: boolean; avatar_url: string | null };
 
@@ -95,20 +96,20 @@ export default function Nav() {
                 href="/account"
                 className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
               >
-                <Settings/>
+                <Settings />
               </Link>
-              <button
-                onClick={signOut}
-                className="text-sm text-ink-faint hover:text-ink transition-colors"
-              >
-                Sign out
-              </button>
               <Link
                 href="/submit"
                 className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
               >
                 Add an API
               </Link>
+              <button
+                onClick={signOut}
+                className="text-sm bg-red text-ink-faint hover:text-ink transition-colors"
+              >
+                <LogOut />
+              </button>
             </div>
           ) : (
             <>
