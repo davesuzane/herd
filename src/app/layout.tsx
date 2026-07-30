@@ -8,7 +8,7 @@ import { Analytics } from "@vercel/analytics/next";
 import SubNav from "@/components/SubNav";
 import FloatingChatButton from "@/components/FloatingChatButton";
 import PresenceProvider from "@/components/PresenceProvider";
-import StoriesTraySection from '@/components/StoriesTraySection' 
+import StoriesTraySection from "@/components/StoriesTraySection";
 
 const zilla = Zilla_Slab({
   subsets: ["latin"],
@@ -45,11 +45,11 @@ export default function RootLayout({
         <PresenceProvider>
           <Analytics />
           <FloatingChatButton />
-           <Nav />
-<SubNav />
-<StoriesTraySection />
-<div className="flex-1">{children}</div>
-<Footer />>
+          <Nav />
+          <SubNav />
+          <StoriesTraySection />
+          <div className="flex-1">{children}</div>
+          <Footer />
         </PresenceProvider>
       </body>
     </html>
