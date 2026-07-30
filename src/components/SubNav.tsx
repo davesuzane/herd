@@ -30,6 +30,9 @@ export default function SubNav() {
         >
           party
         </Link>
+        <Link href="/herdis" className="text-xs font-mono text-ink-faint hover:text-ink-dim transition">
+  Herdis
+</Link>
         <Link
           href="/TruthDump"
           className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"

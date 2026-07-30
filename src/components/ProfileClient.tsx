@@ -242,7 +242,7 @@ export default function ProfileClient({
       {!isSelf && (
         <>
           <p className="text-xs font-mono uppercase text-ink-faint mb-3">
-            Give them an emoji
+            Give them an emoji!
           </p>
           <div className="grid grid-cols-6 gap-2 mb-4">
             {EMOJI_PALETTE.map((emoji) => (
