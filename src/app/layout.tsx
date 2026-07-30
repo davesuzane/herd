@@ -44,7 +44,7 @@ export default function RootLayout({
       <body className="font-body min-h-screen flex flex-col">
         <PresenceProvider>
           <Analytics />
-          <FloatingChatButton />
+
           <Nav />
           <SubNav />
           <StoriesTraySection />
