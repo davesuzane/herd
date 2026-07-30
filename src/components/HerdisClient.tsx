@@ -1,19 +1,22 @@
 // src/components/HerdisClient.tsx
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { validateFile } from "@/utils/validateFile";
 import { getVideoDuration } from "@/utils/getVideoDuration";
+import { generateThumbnail } from "@/utils/generateThumbnail";
 
 type Item = {
   id: string;
   videoUrl: string;
+  thumbnailUrl: string | null;
   caption: string | null;
   username: string;
   likeCount: number;
   liked: boolean;
+  viewCount: number;
 };
 
 export default function HerdisClient({
@@ -27,9 +30,14 @@ export default function HerdisClient({
   const router = useRouter();
   const [list, setList] = useState(items);
   const [showUpload, setShowUpload] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [sendFor, setSendFor] = useState<string | null>(null);
+  const viewedRef = useRef<Set<string>>(new Set());
 
   async function toggleLike(id: string) {
     if (!currentUserId) {
@@ -63,9 +71,9 @@ export default function HerdisClient({
     );
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !currentUserId) return;
+    if (!file) return;
     setError("");
 
     const validationError = validateFile(file, {
@@ -77,8 +85,16 @@ export default function HerdisClient({
       return;
     }
 
+    setPendingFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function confirmUpload() {
+    if (!pendingFile || !currentUserId) return;
+    setError("");
+
     try {
-      const duration = await getVideoDuration(file);
+      const duration = await getVideoDuration(pendingFile);
       if (duration > 30) {
         setError("Keep it under 30 seconds.");
         return;
@@ -89,31 +105,59 @@ export default function HerdisClient({
     }
 
     setUploading(true);
-    const filePath = `${currentUserId}/${crypto.randomUUID()}-${file.name}`;
+
+    const videoPath = `${currentUserId}/${crypto.randomUUID()}-${pendingFile.name}`;
     const { error: uploadError } = await supabase.storage
       .from("herdis")
-      .upload(filePath, file);
+      .upload(videoPath, pendingFile);
     if (uploadError) {
       setError(uploadError.message);
       setUploading(false);
       return;
     }
+    const { data: videoUrlData } = supabase.storage
+      .from("herdis")
+      .getPublicUrl(videoPath);
 
-    const { data: urlData } = supabase.storage
-      .from("herdis")
-      .getPublicUrl(filePath);
-    await supabase
-      .from("herdis")
-      .insert({
-        profile_id: currentUserId,
-        video_url: urlData.publicUrl,
-        caption: caption || null,
-      });
+    let thumbnailUrl: string | null = null;
+    try {
+      const thumbBlob = await generateThumbnail(pendingFile);
+      const thumbPath = `${currentUserId}/${crypto.randomUUID()}-thumb.jpg`;
+      const { error: thumbError } = await supabase.storage
+        .from("herdis")
+        .upload(thumbPath, thumbBlob);
+      if (!thumbError) {
+        const { data: thumbUrlData } = supabase.storage
+          .from("herdis")
+          .getPublicUrl(thumbPath);
+        thumbnailUrl = thumbUrlData.publicUrl;
+      }
+    } catch {
+      // thumbnail is a nice-to-have — a failed capture shouldn't block the post
+    }
+
+    await supabase.from("herdis").insert({
+      profile_id: currentUserId,
+      video_url: videoUrlData.publicUrl,
+      thumbnail_url: thumbnailUrl,
+      caption: caption || null,
+    });
 
     setUploading(false);
     setShowUpload(false);
+    setPendingFile(null);
+    setPreviewUrl(null);
     setCaption("");
     router.refresh();
+  }
+
+  function trackView(id: string) {
+    if (viewedRef.current.has(id)) return;
+    viewedRef.current.add(id);
+    supabase.rpc("increment_herdi_view", { target_id: id });
+    setList((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, viewCount: i.viewCount + 1 } : i)),
+    );
   }
 
   return (
@@ -143,13 +187,22 @@ export default function HerdisClient({
             <h2 className="font-display font-bold text-lg mb-3">
               Post a Herdi
             </h2>
-            <input
-              type="file"
-              accept="video/mp4,video/webm"
-              onChange={handleUpload}
-              disabled={uploading}
-              className="text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-2 file:text-ink-dim file:text-xs mb-3"
-            />
+
+            {previewUrl ? (
+              <video
+                src={previewUrl}
+                className="w-full rounded-lg mb-3 max-h-64 object-contain bg-black"
+                controls
+              />
+            ) : (
+              <input
+                type="file"
+                accept="video/mp4,video/webm"
+                onChange={pickFile}
+                className="text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-2 file:text-ink-dim file:text-xs mb-3"
+              />
+            )}
+
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
@@ -157,48 +210,42 @@ export default function HerdisClient({
               className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm mb-3 focus:outline-none focus:border-tag transition"
             />
             <p className="text-[10px] text-ink-faint mb-2">Up to 30 seconds.</p>
-            {uploading && <p className="text-xs text-tag">Uploading…</p>}
-            {error && <p className="text-xs text-flag">{error}</p>}
+            {error && <p className="text-xs text-flag mb-2">{error}</p>}
+
+            {previewUrl && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setPendingFile(null);
+                    setPreviewUrl(null);
+                  }}
+                  className="flex-1 text-xs font-mono border border-line text-ink-dim py-2 rounded hover:border-ink-faint transition"
+                >
+                  Choose different
+                </button>
+                <button
+                  onClick={confirmUpload}
+                  disabled={uploading}
+                  className="flex-1 text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition disabled:opacity-60"
+                >
+                  {uploading ? "Posting…" : "Post it"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       <div className="snap-y snap-mandatory h-[calc(100vh-132px)] overflow-y-scroll">
         {list.map((item) => (
-          <div
+          <HerdiItem
             key={item.id}
-            className="snap-start h-[calc(100vh-132px)] relative flex items-center justify-center bg-black"
-          >
-            <video
-              src={item.videoUrl}
-              className="max-h-full max-w-full"
-              controls
-              loop
-              autoPlay
-              muted
-              playsInline
-            />
-            <div className="absolute bottom-6 left-4 right-16 text-white">
-              <Link
-                href={`/u/${item.username}`}
-                className="font-mono text-sm font-semibold"
-              >
-                @{item.username}
-              </Link>
-              {item.caption && <p className="text-sm mt-1">{item.caption}</p>}
-            </div>
-            <button
-              onClick={() => toggleLike(item.id)}
-              className="absolute bottom-6 right-4 flex flex-col items-center gap-1"
-            >
-              <span className={`text-3xl ${item.liked ? "" : "opacity-60"}`}>
-                {item.liked ? "❤️" : "🤍"}
-              </span>
-              <span className="text-white text-xs font-mono">
-                {item.likeCount}
-              </span>
-            </button>
-          </div>
+            item={item}
+            onLike={toggleLike}
+            onView={trackView}
+            onComment={() => setCommentsFor(item.id)}
+            onSend={() => setSendFor(item.id)}
+          />
         ))}
         {list.length === 0 && (
           <div className="h-full flex items-center justify-center text-ink-faint text-sm">
@@ -206,6 +253,324 @@ export default function HerdisClient({
           </div>
         )}
       </div>
+
+      {commentsFor && (
+        <CommentsDrawer
+          herdiId={commentsFor}
+          currentUserId={currentUserId}
+          onClose={() => setCommentsFor(null)}
+        />
+      )}
+      {sendFor && (
+        <SendToDmModal
+          herdiId={sendFor}
+          currentUserId={currentUserId}
+          onClose={() => setSendFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function HerdiItem({
+  item,
+  onLike,
+  onView,
+  onComment,
+  onSend,
+}: {
+  item: Item;
+  onLike: (id: string) => void;
+  onView: (id: string) => void;
+  onComment: () => void;
+  onSend: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) onView(item.id);
+        }),
+      { threshold: 0.6 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [item.id]);
+
+  async function copyShareLink() {
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/herdis/${item.id}`,
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="snap-start h-[calc(100vh-132px)] relative flex items-center justify-center bg-black"
+    >
+      <video
+        src={item.videoUrl}
+        poster={item.thumbnailUrl ?? undefined}
+        className="max-h-full max-w-full"
+        controls
+        loop
+        autoPlay
+        muted
+        playsInline
+      />
+
+      <div className="absolute bottom-6 left-4 right-16 text-white">
+        <Link
+          href={`/u/${item.username}`}
+          className="font-mono text-sm font-semibold"
+        >
+          @{item.username}
+        </Link>
+        {item.caption && <p className="text-sm mt-1">{item.caption}</p>}
+        <p className="text-[10px] text-white/60 mt-1 font-mono">
+          {item.viewCount} views
+        </p>
+      </div>
+
+      <div className="absolute bottom-6 right-4 flex flex-col items-center gap-4">
+        <button
+          onClick={() => onLike(item.id)}
+          className="flex flex-col items-center gap-1"
+        >
+          <span className={`text-3xl ${item.liked ? "" : "opacity-60"}`}>
+            {item.liked ? "❤️" : "🤍"}
+          </span>
+          <span className="text-white text-xs font-mono">{item.likeCount}</span>
+        </button>
+        <button
+          onClick={onComment}
+          className="flex flex-col items-center gap-1"
+        >
+          <span className="text-2xl opacity-80">💬</span>
+        </button>
+        <button onClick={onSend} className="flex flex-col items-center gap-1">
+          <span className="text-2xl opacity-80">➤</span>
+        </button>
+        <button
+          onClick={copyShareLink}
+          className="flex flex-col items-center gap-1"
+        >
+          <span className="text-2xl opacity-80">🔗</span>
+          {copied && (
+            <span className="text-white text-[9px] font-mono">Copied</span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CommentsDrawer({
+  herdiId,
+  currentUserId,
+  onClose,
+}: {
+  herdiId: string;
+  currentUserId: string | null;
+  onClose: () => void;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [comments, setComments] = useState<any[]>([]);
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
+  const [body, setBody] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("herdis_comments")
+        .select("id, user_id, body, created_at")
+        .eq("herdi_id", herdiId)
+        .order("created_at");
+      setComments(data || []);
+      const ids = [...new Set((data || []).map((c) => c.user_id))];
+      if (ids.length) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .in("id", ids);
+        const map: Record<string, string> = {};
+        profiles?.forEach((p) => {
+          map[p.id] = p.username;
+        });
+        setUsernames(map);
+      }
+    }
+    load();
+  }, [herdiId]);
+
+  async function postComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentUserId) {
+      router.push("/login?redirect=/herdis");
+      return;
+    }
+    if (!body.trim()) return;
+
+    const { data } = await supabase
+      .from("herdis_comments")
+      .insert({ herdi_id: herdiId, user_id: currentUserId, body })
+      .select()
+      .single();
+    if (data) {
+      setComments((prev) => [...prev, data]);
+      setUsernames((prev) => ({ ...prev }));
+      setBody("");
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 z-50 flex items-end"
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface w-full max-h-[70vh] rounded-t-xl p-4 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-display font-semibold">Comments</h3>
+          <button onClick={onClose} className="text-ink-faint">
+            ✕
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 mb-3">
+          {comments.map((c) => (
+            <div key={c.id} className="text-sm">
+              <span className="font-mono text-xs text-tag mr-2">
+                {usernames[c.user_id] ?? "…"}
+              </span>
+              {c.body}
+            </div>
+          ))}
+          {comments.length === 0 && (
+            <p className="text-sm text-ink-faint">No comments yet.</p>
+          )}
+        </div>
+        <form onSubmit={postComment} className="flex gap-2">
+          <input
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Add a comment"
+            className="flex-1 bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition"
+          />
+          <button
+            type="submit"
+            className="text-xs font-mono bg-tag text-[#1a2015] font-semibold px-4 rounded hover:brightness-110 transition"
+          >
+            Post
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SendToDmModal({
+  herdiId,
+  currentUserId,
+  onClose,
+}: {
+  herdiId: string;
+  currentUserId: string | null;
+  onClose: () => void;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [status, setStatus] = useState("");
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentUserId) {
+      router.push("/login?redirect=/herdis");
+      return;
+    }
+    setStatus("");
+
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .eq("username", username.trim())
+      .maybeSingle();
+    if (!target) {
+      setStatus("No user with that username.");
+      return;
+    }
+
+    const [userA, userB] = [currentUserId, target.id].sort();
+    const { data: existing } = await supabase
+      .from("dm_conversations")
+      .select("id")
+      .eq("user_a", userA)
+      .eq("user_b", userB)
+      .maybeSingle();
+
+    let conversationId = existing?.id;
+    if (!conversationId) {
+      const { data: created, error } = await supabase
+        .from("dm_conversations")
+        .insert({ user_a: userA, user_b: userB })
+        .select()
+        .single();
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+      conversationId = created.id;
+    }
+
+    const link = `${window.location.origin}/herdis/${herdiId}`;
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversationId,
+      sender_id: currentUserId,
+      body: `Sent a Herdi: ${link}`,
+    });
+
+    setStatus("Sent ✓");
+    setTimeout(() => {
+      onClose();
+      router.push(`/chat?dm=${target.username}`);
+    }, 700);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={send}
+        className="bg-surface border border-line rounded-xl p-6 max-w-xs w-full space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-display font-semibold">Send this Herdi</h3>
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="username"
+          className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition"
+        />
+        {status && <p className="text-xs text-ink-faint">{status}</p>}
+        <button
+          type="submit"
+          className="w-full text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition"
+        >
+          Send
+        </button>
+      </form>
     </div>
   );
 }
