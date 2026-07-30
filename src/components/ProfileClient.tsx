@@ -83,6 +83,10 @@ export default function ProfileClient({
   const [addedCount, setAddedCount] = useState(addedByCount);
   const [galleryPhotos, setGalleryPhotos] = useState(photos);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [customEmoji, setCustomEmoji] = useState("");
+
+  const isSelf = currentUserId === profile.id;
+  const topEmoji = [...emojiSummary].sort((a, b) => b.votes - a.votes)[0];
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -112,6 +116,7 @@ export default function ProfileClient({
     await supabase.from("profile_photos").delete().eq("id", photoId);
     setGalleryPhotos((prev) => prev.filter((p) => p.id !== photoId));
   }
+
   async function toggleAdd() {
     if (!currentUserId) {
       router.push(`/login?redirect=/u/${profile.username}`);
@@ -137,10 +142,6 @@ export default function ProfileClient({
       }
     }
   }
-  const [customEmoji, setCustomEmoji] = useState("");
-
-  const isSelf = currentUserId === profile.id;
-  const topEmoji = [...emojiSummary].sort((a, b) => b.votes - a.votes)[0];
 
   async function castVote(emoji: string) {
     if (!currentUserId) {
@@ -177,11 +178,6 @@ export default function ProfileClient({
             {profile.username[0]?.toUpperCase()}
           </div>
         )}
-        <StoriesGallery
-          profileId={profile.id}
-          initialStories={stories || []}
-          isSelf={user?.id === profile.id}
-        />
         {topEmoji && (
           <span className="absolute -bottom-1 -right-1 text-3xl bg-bg rounded-full">
             {topEmoji.emoji}
@@ -189,7 +185,13 @@ export default function ProfileClient({
         )}
       </div>
 
-      <h1 className="font-display font-bold text-2xl mb-1">
+      <StoriesGallery
+        profileId={profile.id}
+        initialStories={stories || []}
+        isSelf={isSelf}
+      />
+
+      <h1 className="font-display font-bold text-2xl mb-1 mt-4">
         @{profile.username}
       </h1>
       {profile.bio && (
