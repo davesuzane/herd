@@ -99,10 +99,10 @@ export default function Nav() {
                 <Settings />
               </Link>
               <Link
-                href="/submit"
+                href="/chat"
                 className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
               >
-                Add an API
+                chat
               </Link>
               <button
                 onClick={signOut}

@@ -34,15 +34,7 @@ export default function StoriesTray({ people }: { people: Person[] }) {
     <>
       <div className="border-b border-line bg-bg-alt">
         <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-4 overflow-x-auto">
-          <Link
-            href="/chat"
-            className="flex flex-col items-center gap-1 flex-shrink-0"
-          >
-            <div className="w-14 h-14 rounded-full bg-tag flex items-center justify-center text-xl">
-              💬
-            </div>
-            <span className="text-[10px] font-mono text-ink-faint">Chat</span>
-          </Link>
+        
 
           {people.map((p) => (
             <button
