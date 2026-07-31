@@ -106,7 +106,13 @@ export default function HerdisClient({
 
     setUploading(true);
 
-    const videoPath = `${currentUserId}/${crypto.randomUUID()}-${pendingFile.name}`;
+    const ext =
+      pendingFile.name
+        .split(".")
+        .pop()
+        ?.replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase() || "mp4";
+    const videoPath = `${currentUserId}/${crypto.randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("herdis")
       .upload(videoPath, pendingFile);
