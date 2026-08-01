@@ -31,6 +31,10 @@ export default function HerdisClient({
   const [list, setList] = useState(items);
   const [showUpload, setShowUpload] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setList(items);
+  }, [items]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -142,12 +146,22 @@ export default function HerdisClient({
       // thumbnail is a nice-to-have — a failed capture shouldn't block the post
     }
 
-    await supabase.from("herdis").insert({
-      profile_id: currentUserId,
-      video_url: videoUrlData.publicUrl,
-      thumbnail_url: thumbnailUrl,
-      caption: caption || null,
-    });
+    const { data: insertedHerdi, error: insertError } = await supabase
+      .from("herdis")
+      .insert({
+        profile_id: currentUserId,
+        video_url: videoUrlData.publicUrl,
+        thumbnail_url: thumbnailUrl,
+        caption: caption || null,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      setError(insertError.message);
+      setUploading(false);
+      return;
+    }
 
     setUploading(false);
     setShowUpload(false);
