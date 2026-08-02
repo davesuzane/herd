@@ -58,7 +58,12 @@ export default function HerdisClient({
   useEffect(() => {
     setList(shuffle(items));
   }, [items]);
-
+async function deleteHerdi(id: string) {
+  if (!confirm('Delete this post?')) return
+  const { error } = await supabase.from('herdis').delete().eq('id', id)
+  if (error) { alert(error.message); return }
+  setList(prev => prev.filter(i => i.id !== id))
+}
   async function toggleLike(id: string) {
     if (!currentUserId) {
       router.push("/login?redirect=/herdis");
@@ -270,13 +275,15 @@ export default function HerdisClient({
         </div>
       )}
 
-      <HerdisPlayer
-        list={list}
-        onLike={toggleLike}
-        onView={trackView}
-        onComment={(id) => setCommentsFor(id)}
-        onSend={(id) => setSendFor(id)}
-      />
+     <HerdisPlayer
+  list={list}
+  onLike={toggleLike}
+  onView={trackView}
+  onComment={(id) => setCommentsFor(id)}
+  onSend={(id) => setSendFor(id)}
+  isAdmin={isAdmin}
+  onDelete={deleteHerdi}
+/>
 
       {commentsFor && (
         <CommentsDrawer
@@ -299,17 +306,11 @@ export default function HerdisClient({
 // ---------- The custom shorts player ----------
 
 function HerdisPlayer({
-  list,
-  onLike,
-  onView,
-  onComment,
-  onSend,
+  list, onLike, onView, onComment, onSend, isAdmin, onDelete,
 }: {
-  list: Item[];
-  onLike: (id: string) => void;
-  onView: (id: string) => void;
-  onComment: (id: string) => void;
-  onSend: (id: string) => void;
+  list: Item[]; onLike: (id: string) => void; onView: (id: string) => void
+  onComment: (id: string) => void; onSend: (id: string) => void
+  isAdmin: boolean; onDelete: (id: string) => void
 }) {
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -406,19 +407,19 @@ function HerdisPlayer({
         style={{ transform: `translateY(calc(-${index} * (100dvh - 132px)))` }}
       >
         {list.map((item, i) => (
-          <HerdiSlide
-            key={item.id}
-            item={item}
-            isActive={i === index}
-            muted={muted}
-            setMuted={setMuted}
-            videoRef={(el) => {
-              videoRefs.current[i] = el;
-            }}
-            onLike={onLike}
-            onComment={() => onComment(item.id)}
-            onSend={() => onSend(item.id)}
-          />
+         <HerdiSlide
+  key={item.id}
+  item={item}
+  isActive={i === index}
+  muted={muted}
+  setMuted={setMuted}
+  videoRef={(el) => { videoRefs.current[i] = el }}
+  onLike={onLike}
+  onComment={() => onComment(item.id)}
+  onSend={() => onSend(item.id)}
+  isAdmin={isAdmin}
+  onDelete={() => onDelete(item.id)}
+/>
         ))}
       </div>
 
@@ -435,23 +436,12 @@ function HerdisPlayer({
 }
 
 function HerdiSlide({
-  item,
-  isActive,
-  muted,
-  setMuted,
-  videoRef,
-  onLike,
-  onComment,
-  onSend,
+  item, isActive, muted, setMuted, videoRef, onLike, onComment, onSend, isAdmin, onDelete,
 }: {
-  item: Item;
-  isActive: boolean;
-  muted: boolean;
-  setMuted: (fn: (m: boolean) => boolean) => void;
-  videoRef: (el: HTMLVideoElement | null) => void;
-  onLike: (id: string) => void;
-  onComment: () => void;
-  onSend: () => void;
+  item: Item; isActive: boolean; muted: boolean; setMuted: (fn: (m: boolean) => boolean) => void
+  videoRef: (el: HTMLVideoElement | null) => void
+  onLike: (id: string) => void; onComment: () => void; onSend: () => void
+  isAdmin: boolean; onDelete: () => void
 }) {
   const localRef = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(true);
@@ -518,7 +508,11 @@ function HerdiSlide({
           <span className="text-6xl text-white/85">▶</span>
         </button>
       )}
-
+{isAdmin && (
+  <button onClick={onDelete} className="absolute top-4 left-4 text-white text-xl z-10 bg-flag/80 rounded-full w-9 h-9 flex items-center justify-center">
+    🗑️
+  </button>
+)}
       <button
         onClick={() => setMuted((m) => !m)}
         className="absolute top-4 right-4 text-white text-xl z-10"

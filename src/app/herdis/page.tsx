@@ -2,7 +2,15 @@
 import { createClient } from "@/utils/supabase/server";
 import HerdisClient from "@/components/HerdisClient";
 
-export default async function HerdisPage() {
+export default function HerdisClient({
+  items,
+  currentUserId,
+  isAdmin,
+}: {
+  items: Item[];
+  currentUserId: string | null;
+  isAdmin: boolean;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
