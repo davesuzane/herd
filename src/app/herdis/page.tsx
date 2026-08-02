@@ -2,15 +2,7 @@
 import { createClient } from "@/utils/supabase/server";
 import HerdisClient from "@/components/HerdisClient";
 
-export default function HerdisClient({
-  items,
-  currentUserId,
-  isAdmin,
-}: {
-  items: Item[];
-  currentUserId: string | null;
-  isAdmin: boolean;
-}) {
+export default async async async async async async function HerdisPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -55,7 +47,7 @@ export default function HerdisClient({
   if (user) {
     const { data: myLikes } = await supabase
       .from("herdis_likes")
-      .select("herdi_id")
+      .select("herdi_id")async 
       .eq("user_id", user.id);
     likedIds = new Set((myLikes || []).map((l) => l.herdi_id));
   }
