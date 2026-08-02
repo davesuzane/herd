@@ -8,13 +8,32 @@ export default async function HerdisPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: herdis } = await supabase
+  const { data: herdis, error: herdisError } = await supabase
     .from("herdis")
     .select(
-      "id, video_url, thumbnail_url, caption, view_count, profile_id, created_at, profiles(username), herdis_like_counts(like_count)",
+      "id, video_url, thumbnail_url, caption, view_count, profile_id, created_at, profiles(username)",
     )
     .order("created_at", { ascending: false })
     .limit(30);
+
+  if (herdisError) {
+    // Surfaces the real error in your server logs / Vercel logs instead of
+    // silently rendering an empty feed like it was doing before.
+    console.error("Herdis fetch error:", herdisError);
+  }
+
+  const ids = (herdis || []).map((h) => h.id);
+
+  const { data: likeCounts } = ids.length
+    ? await supabase
+        .from("herdis_like_counts")
+        .select("herdi_id, like_count")
+        .in("herdi_id", ids)
+    : { data: [] };
+
+  const likeCountMap = new Map(
+    (likeCounts || []).map((l) => [l.herdi_id, l.like_count]),
+  );
 
   let likedIds = new Set<string>();
   if (user) {
@@ -31,7 +50,7 @@ export default async function HerdisPage() {
     thumbnailUrl: h.thumbnail_url,
     caption: h.caption,
     username: h.profiles?.username ?? "someone",
-    likeCount: h.herdis_like_counts?.[0]?.like_count ?? 0,
+    likeCount: likeCountMap.get(h.id) ?? 0,
     liked: likedIds.has(h.id),
     viewCount: h.view_count ?? 0,
   }));
