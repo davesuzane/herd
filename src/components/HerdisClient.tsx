@@ -27,9 +27,6 @@ export default function HerdisClient({ items, currentUserId }: { items: Item[]; 
   const [sendFor, setSendFor] = useState<string | null>(null)
   const viewedRef = useRef<Set<string>>(new Set())
 
-  // Keeps the displayed list in sync whenever the server sends fresh data
-  // (e.g. after router.refresh() following a new post) — without this,
-  // newly posted videos never appear until a full page reload.
   useEffect(() => {
     setList(items)
   }, [items])
@@ -78,7 +75,6 @@ export default function HerdisClient({ items, currentUserId }: { items: Item[]; 
     const { error: uploadError } = await supabase.storage.from('herdis').upload(videoPath, pendingFile)
 
     if (uploadError) {
-      console.error('Video upload failed:', uploadError)
       setError(`Upload failed: ${uploadError.message}`)
       setUploading(false)
       return
@@ -91,29 +87,24 @@ export default function HerdisClient({ items, currentUserId }: { items: Item[]; 
       const thumbBlob = await generateThumbnail(pendingFile)
       const thumbPath = `${currentUserId}/${crypto.randomUUID()}-thumb.jpg`
       const { error: thumbError } = await supabase.storage.from('herdis').upload(thumbPath, thumbBlob)
-      if (thumbError) {
-        console.error('Thumbnail upload failed (non-fatal, post continues):', thumbError)
-      } else {
+      if (!thumbError) {
         const { data: thumbUrlData } = supabase.storage.from('herdis').getPublicUrl(thumbPath)
         thumbnailUrl = thumbUrlData.publicUrl
       }
-    } catch (err) {
-      console.error('Thumbnail generation failed (non-fatal, post continues):', err)
+    } catch {
+      // non-fatal
     }
 
-    const { data: insertedHerdi, error: insertError } = await supabase.from('herdis').insert({
+    const { error: insertError } = await supabase.from('herdis').insert({
       profile_id: currentUserId, video_url: videoUrlData.publicUrl, thumbnail_url: thumbnailUrl, caption: caption || null,
-    }).select().single()
+    })
 
     setUploading(false)
 
     if (insertError) {
-      console.error('Herdi insert failed:', insertError)
       setError(`Post failed: ${insertError.message}`)
       return
     }
-
-    console.log('Herdi posted successfully:', insertedHerdi)
 
     setShowUpload(false)
     setPendingFile(null)
@@ -171,15 +162,13 @@ export default function HerdisClient({ items, currentUserId }: { items: Item[]; 
         </div>
       )}
 
-      <div className="snap-y snap-mandatory h-[calc(100vh-132px)] overflow-y-scroll">
-        {list.map(item => (
-          <HerdiItem key={item.id} item={item} onLike={toggleLike} onView={trackView}
-            onComment={() => setCommentsFor(item.id)} onSend={() => setSendFor(item.id)} />
-        ))}
-        {list.length === 0 && (
-          <div className="h-full flex items-center justify-center text-ink-faint text-sm">No Herdis yet — post the first one.</div>
-        )}
-      </div>
+      <HerdisPlayer
+        list={list}
+        onLike={toggleLike}
+        onView={trackView}
+        onComment={(id) => setCommentsFor(id)}
+        onSend={(id) => setSendFor(id)}
+      />
 
       {commentsFor && <CommentsDrawer herdiId={commentsFor} currentUserId={currentUserId} onClose={() => setCommentsFor(null)} />}
       {sendFor && <SendToDmModal herdiId={sendFor} currentUserId={currentUserId} onClose={() => setSendFor(null)} />}
@@ -187,22 +176,134 @@ export default function HerdisClient({ items, currentUserId }: { items: Item[]; 
   )
 }
 
-function HerdiItem({
-  item, onLike, onView, onComment, onSend,
-}: { item: Item; onLike: (id: string) => void; onView: (id: string) => void; onComment: () => void; onSend: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [copied, setCopied] = useState(false)
+// ---------- The custom shorts player ----------
+
+function HerdisPlayer({
+  list, onLike, onView, onComment, onSend,
+}: { list: Item[]; onLike: (id: string) => void; onView: (id: string) => void; onComment: (id: string) => void; onSend: (id: string) => void }) {
+  const [index, setIndex] = useState(0)
+  const [muted, setMuted] = useState(true)
+  const transitioningRef = useRef(false)
+  const touchStartY = useRef<number | null>(null)
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) onView(item.id) }),
-      { threshold: 0.6 }
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return
+      if (i === index) {
+        v.currentTime = 0
+        v.play().catch(() => {})
+      } else {
+        v.pause()
+      }
+    })
+    if (list[index]) onView(list[index].id)
+  }, [index, list])
+
+  function goTo(newIndex: number) {
+    if (transitioningRef.current) return
+    const clamped = Math.max(0, Math.min(list.length - 1, newIndex))
+    if (clamped === index) return
+    transitioningRef.current = true
+    setIndex(clamped)
+    setTimeout(() => { transitioningRef.current = false }, 320)
+  }
+
+  function handleWheel(e: React.WheelEvent) {
+    if (Math.abs(e.deltaY) < 15) return
+    goTo(e.deltaY > 0 ? index + 1 : index - 1)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartY.current === null) return
+    const delta = touchStartY.current - e.changedTouches[0].clientY
+    if (Math.abs(delta) > 50) goTo(delta > 0 ? index + 1 : index - 1)
+    touchStartY.current = null
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(index + 1) }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(index - 1) }
+  }
+
+  if (list.length === 0) {
+    return (
+      <div className="h-[calc(100vh-132px)] flex items-center justify-center text-ink-faint text-sm">
+        No Herdis yet — post the first one.
+      </div>
     )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [item.id])
+  }
+
+  return (
+    <div
+      tabIndex={0}
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onKeyDown={handleKeyDown}
+      className="relative h-[calc(100vh-132px)] overflow-hidden outline-none"
+    >
+      <div
+        className="transition-transform duration-300 ease-out"
+        style={{ transform: `translateY(-${index * 100}%)` }}
+      >
+        {list.map((item, i) => (
+          <HerdiSlide
+            key={item.id}
+            item={item}
+            isActive={i === index}
+            muted={muted}
+            setMuted={setMuted}
+            videoRef={(el) => { videoRefs.current[i] = el }}
+            onLike={onLike}
+            onComment={() => onComment(item.id)}
+            onSend={() => onSend(item.id)}
+          />
+        ))}
+      </div>
+
+      {/* Up/down hint dots, purely visual */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
+        {list.map((_, i) => (
+          <div key={i} className={`w-1 h-1 rounded-full transition ${i === index ? 'bg-tag' : 'bg-white/20'}`} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function HerdiSlide({
+  item, isActive, muted, setMuted, videoRef, onLike, onComment, onSend,
+}: {
+  item: Item; isActive: boolean; muted: boolean; setMuted: (fn: (m: boolean) => boolean) => void
+  videoRef: (el: HTMLVideoElement | null) => void
+  onLike: (id: string) => void; onComment: () => void; onSend: () => void
+}) {
+  const localRef = useRef<HTMLVideoElement | null>(null)
+  const [playing, setPlaying] = useState(true)
+  const [progress, setProgress] = useState(0)
+  const [copied, setCopied] = useState(false)
+
+  function setRefs(el: HTMLVideoElement | null) {
+    localRef.current = el
+    videoRef(el)
+  }
+
+  function togglePlay() {
+    const v = localRef.current
+    if (!v) return
+    if (v.paused) { v.play(); setPlaying(true) } else { v.pause(); setPlaying(false) }
+  }
+
+  function handleTimeUpdate() {
+    const v = localRef.current
+    if (!v || !v.duration) return
+    setProgress((v.currentTime / v.duration) * 100)
+  }
 
   async function copyShareLink() {
     await navigator.clipboard.writeText(`${window.location.origin}/herdis/${item.id}`)
@@ -211,8 +312,32 @@ function HerdiItem({
   }
 
   return (
-    <div ref={ref} className="snap-start h-[calc(100vh-132px)] relative flex items-center justify-center bg-black">
-      <video src={item.videoUrl} poster={item.thumbnailUrl ?? undefined} className="max-h-full max-w-full" controls loop autoPlay muted playsInline />
+    <div className="h-[calc(100vh-132px)] relative flex items-center justify-center bg-black">
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/20 z-10">
+        <div className="h-full bg-tag" style={{ width: `${isActive ? progress : 0}%` }} />
+      </div>
+
+      <video
+        ref={setRefs}
+        src={item.videoUrl}
+        poster={item.thumbnailUrl ?? undefined}
+        className="max-h-full max-w-full"
+        loop
+        muted={muted}
+        playsInline
+        onClick={togglePlay}
+        onTimeUpdate={handleTimeUpdate}
+      />
+
+      {!playing && isActive && (
+        <button onClick={togglePlay} className="absolute inset-0 flex items-center justify-center">
+          <span className="text-6xl text-white/85">▶</span>
+        </button>
+      )}
+
+      <button onClick={() => setMuted(m => !m)} className="absolute top-4 right-4 text-white text-xl z-10">
+        {muted ? '🔇' : '🔊'}
+      </button>
 
       <div className="absolute bottom-6 left-4 right-16 text-white">
         <Link href={`/u/${item.username}`} className="font-mono text-sm font-semibold">@{item.username}</Link>
@@ -239,6 +364,8 @@ function HerdiItem({
     </div>
   )
 }
+
+// ---------- Unchanged from before ----------
 
 function CommentsDrawer({ herdiId, currentUserId, onClose }: { herdiId: string; currentUserId: string | null; onClose: () => void }) {
   const supabase = createClient()
