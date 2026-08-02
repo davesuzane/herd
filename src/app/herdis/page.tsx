@@ -13,8 +13,6 @@ export default async function HerdisPage() {
     .limit(30)
 
   if (herdisError) {
-    // Surfaces the real error in your server logs / Vercel logs instead of
-    // silently rendering an empty feed like it was doing before.
     console.error('Herdis fetch error:', herdisError)
   }
 
@@ -44,5 +42,4 @@ export default async function HerdisPage() {
   }))
 
   return <HerdisClient items={items} currentUserId={user?.id ?? null} />
-}
 }

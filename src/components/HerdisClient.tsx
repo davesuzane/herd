@@ -1,254 +1,169 @@
 // src/components/HerdisClient.tsx
-"use client";
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
-import { validateFile } from "@/utils/validateFile";
-import { getVideoDuration } from "@/utils/getVideoDuration";
-import { generateThumbnail } from "@/utils/generateThumbnail";
+'use client'
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
+import { validateFile } from '@/utils/validateFile'
+import { getVideoDuration } from '@/utils/getVideoDuration'
+import { generateThumbnail } from '@/utils/generateThumbnail'
 
 type Item = {
-  id: string;
-  videoUrl: string;
-  thumbnailUrl: string | null;
-  caption: string | null;
-  username: string;
-  likeCount: number;
-  liked: boolean;
-  viewCount: number;
-};
+  id: string; videoUrl: string; thumbnailUrl: string | null; caption: string | null
+  username: string; likeCount: number; liked: boolean; viewCount: number
+}
 
-export default function HerdisClient({
-  items,
-  currentUserId,
-}: {
-  items: Item[];
-  currentUserId: string | null;
-}) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [list, setList] = useState(items);
-  const [showUpload, setShowUpload] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+export default function HerdisClient({ items, currentUserId }: { items: Item[]; currentUserId: string | null }) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [list, setList] = useState(items)
+  const [showUpload, setShowUpload] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [caption, setCaption] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [commentsFor, setCommentsFor] = useState<string | null>(null)
+  const [sendFor, setSendFor] = useState<string | null>(null)
+  const viewedRef = useRef<Set<string>>(new Set())
 
+  // Keeps the displayed list in sync whenever the server sends fresh data
+  // (e.g. after router.refresh() following a new post) — without this,
+  // newly posted videos never appear until a full page reload.
   useEffect(() => {
-    setList(items);
-  }, [items]);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [caption, setCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const [commentsFor, setCommentsFor] = useState<string | null>(null);
-  const [sendFor, setSendFor] = useState<string | null>(null);
-  const viewedRef = useRef<Set<string>>(new Set());
+    setList(items)
+  }, [items])
 
   async function toggleLike(id: string) {
-    if (!currentUserId) {
-      router.push("/login?redirect=/herdis");
-      return;
-    }
-    const item = list.find((i) => i.id === id);
-    if (!item) return;
+    if (!currentUserId) { router.push('/login?redirect=/herdis'); return }
+    const item = list.find(i => i.id === id)
+    if (!item) return
 
     if (item.liked) {
-      await supabase
-        .from("herdis_likes")
-        .delete()
-        .eq("herdi_id", id)
-        .eq("user_id", currentUserId);
+      await supabase.from('herdis_likes').delete().eq('herdi_id', id).eq('user_id', currentUserId)
     } else {
-      await supabase
-        .from("herdis_likes")
-        .insert({ herdi_id: id, user_id: currentUserId });
+      await supabase.from('herdis_likes').insert({ herdi_id: id, user_id: currentUserId })
     }
-    setList((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? {
-              ...i,
-              liked: !i.liked,
-              likeCount: i.likeCount + (i.liked ? -1 : 1),
-            }
-          : i,
-      ),
-    );
+    setList(prev => prev.map(i => i.id === id ? { ...i, liked: !i.liked, likeCount: i.likeCount + (i.liked ? -1 : 1) } : i))
   }
 
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError("");
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
 
-    const validationError = validateFile(file, {
-      maxSizeMB: 25,
-      allowedTypes: ["video/mp4", "video/webm"],
-    });
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    const validationError = validateFile(file, { maxSizeMB: 25, allowedTypes: ['video/mp4', 'video/webm'] })
+    if (validationError) { setError(validationError); return }
 
-    setPendingFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPendingFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
   }
 
   async function confirmUpload() {
-    if (!pendingFile || !currentUserId) return;
-    setError("");
+    if (!pendingFile || !currentUserId) return
+    setError('')
 
     try {
-      const duration = await getVideoDuration(pendingFile);
-      if (duration > 30) {
-        setError("Keep it under 30 seconds.");
-        return;
-      }
+      const duration = await getVideoDuration(pendingFile)
+      if (duration > 30) { setError('Keep it under 30 seconds.'); return }
     } catch {
-      setError("Could not read that video.");
-      return;
+      setError('Could not read that video.')
+      return
     }
 
-    setUploading(true);
+    setUploading(true)
 
-    const ext =
-      pendingFile.name
-        .split(".")
-        .pop()
-        ?.replace(/[^a-zA-Z0-9]/g, "")
-        .toLowerCase() || "mp4";
-    const videoPath = `${currentUserId}/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("herdis")
-      .upload(videoPath, pendingFile);
+    const ext = pendingFile.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'mp4'
+    const videoPath = `${currentUserId}/${crypto.randomUUID()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('herdis').upload(videoPath, pendingFile)
+
     if (uploadError) {
-      setError(uploadError.message);
-      setUploading(false);
-      return;
+      console.error('Video upload failed:', uploadError)
+      setError(`Upload failed: ${uploadError.message}`)
+      setUploading(false)
+      return
     }
-    const { data: videoUrlData } = supabase.storage
-      .from("herdis")
-      .getPublicUrl(videoPath);
 
-    let thumbnailUrl: string | null = null;
+    const { data: videoUrlData } = supabase.storage.from('herdis').getPublicUrl(videoPath)
+
+    let thumbnailUrl: string | null = null
     try {
-      const thumbBlob = await generateThumbnail(pendingFile);
-      const thumbPath = `${currentUserId}/${crypto.randomUUID()}-thumb.jpg`;
-      const { error: thumbError } = await supabase.storage
-        .from("herdis")
-        .upload(thumbPath, thumbBlob);
-      if (!thumbError) {
-        const { data: thumbUrlData } = supabase.storage
-          .from("herdis")
-          .getPublicUrl(thumbPath);
-        thumbnailUrl = thumbUrlData.publicUrl;
+      const thumbBlob = await generateThumbnail(pendingFile)
+      const thumbPath = `${currentUserId}/${crypto.randomUUID()}-thumb.jpg`
+      const { error: thumbError } = await supabase.storage.from('herdis').upload(thumbPath, thumbBlob)
+      if (thumbError) {
+        console.error('Thumbnail upload failed (non-fatal, post continues):', thumbError)
+      } else {
+        const { data: thumbUrlData } = supabase.storage.from('herdis').getPublicUrl(thumbPath)
+        thumbnailUrl = thumbUrlData.publicUrl
       }
-    } catch {
-      // thumbnail is a nice-to-have — a failed capture shouldn't block the post
+    } catch (err) {
+      console.error('Thumbnail generation failed (non-fatal, post continues):', err)
     }
 
-    const { data: insertedHerdi, error: insertError } = await supabase
-      .from("herdis")
-      .insert({
-        profile_id: currentUserId,
-        video_url: videoUrlData.publicUrl,
-        thumbnail_url: thumbnailUrl,
-        caption: caption || null,
-      })
-      .select()
-      .single();
+    const { data: insertedHerdi, error: insertError } = await supabase.from('herdis').insert({
+      profile_id: currentUserId, video_url: videoUrlData.publicUrl, thumbnail_url: thumbnailUrl, caption: caption || null,
+    }).select().single()
+
+    setUploading(false)
 
     if (insertError) {
-      setError(insertError.message);
-      setUploading(false);
-      return;
+      console.error('Herdi insert failed:', insertError)
+      setError(`Post failed: ${insertError.message}`)
+      return
     }
 
-    setUploading(false);
-    setShowUpload(false);
-    setPendingFile(null);
-    setPreviewUrl(null);
-    setCaption("");
-    router.refresh();
+    console.log('Herdi posted successfully:', insertedHerdi)
+
+    setShowUpload(false)
+    setPendingFile(null)
+    setPreviewUrl(null)
+    setCaption('')
+    router.refresh()
   }
 
   function trackView(id: string) {
-    if (viewedRef.current.has(id)) return;
-    viewedRef.current.add(id);
-    supabase.rpc("increment_herdi_view", { target_id: id });
-    setList((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, viewCount: i.viewCount + 1 } : i)),
-    );
+    if (viewedRef.current.has(id)) return
+    viewedRef.current.add(id)
+    supabase.rpc('increment_herdi_view', { target_id: id })
+    setList(prev => prev.map(i => i.id === id ? { ...i, viewCount: i.viewCount + 1 } : i))
   }
 
   return (
     <div className="max-w-md mx-auto">
       <div className="fixed top-[132px] right-4 z-40">
-        <button
-          onClick={() =>
-            currentUserId
-              ? setShowUpload(true)
-              : router.push("/login?redirect=/herdis")
-          }
-          className="w-12 h-12 rounded-full bg-tag text-[#1a2015] text-2xl flex items-center justify-center shadow-lg hover:brightness-110 transition"
-        >
+        <button onClick={() => currentUserId ? setShowUpload(true) : router.push('/login?redirect=/herdis')}
+          className="w-12 h-12 rounded-full bg-tag text-[#1a2015] text-2xl flex items-center justify-center shadow-lg hover:brightness-110 transition">
           +
         </button>
       </div>
 
       {showUpload && (
-        <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-6"
-          onClick={() => setShowUpload(false)}
-        >
-          <div
-            className="bg-surface border border-line rounded-xl p-6 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-display font-bold text-lg mb-3">
-              Post a Herdi
-            </h2>
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-6" onClick={() => setShowUpload(false)}>
+          <div className="bg-surface border border-line rounded-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="font-display font-bold text-lg mb-3">Post a Herdi</h2>
 
             {previewUrl ? (
-              <video
-                src={previewUrl}
-                className="w-full rounded-lg mb-3 max-h-64 object-contain bg-black"
-                controls
-              />
+              <video src={previewUrl} className="w-full rounded-lg mb-3 max-h-64 object-contain bg-black" controls />
             ) : (
-              <input
-                type="file"
-                accept="video/mp4,video/webm"
-                onChange={pickFile}
-                className="text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-2 file:text-ink-dim file:text-xs mb-3"
-              />
+              <input type="file" accept="video/mp4,video/webm" onChange={pickFile}
+                className="text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-2 file:text-ink-dim file:text-xs mb-3" />
             )}
 
-            <input
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Caption (optional)"
-              className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm mb-3 focus:outline-none focus:border-tag transition"
-            />
+            <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Caption (optional)"
+              className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm mb-3 focus:outline-none focus:border-tag transition" />
             <p className="text-[10px] text-ink-faint mb-2">Up to 30 seconds.</p>
             {error && <p className="text-xs text-flag mb-2">{error}</p>}
 
             {previewUrl && (
               <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setPendingFile(null);
-                    setPreviewUrl(null);
-                  }}
-                  className="flex-1 text-xs font-mono border border-line text-ink-dim py-2 rounded hover:border-ink-faint transition"
-                >
+                <button onClick={() => { setPendingFile(null); setPreviewUrl(null) }}
+                  className="flex-1 text-xs font-mono border border-line text-ink-dim py-2 rounded hover:border-ink-faint transition">
                   Choose different
                 </button>
-                <button
-                  onClick={confirmUpload}
-                  disabled={uploading}
-                  className="flex-1 text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition disabled:opacity-60"
-                >
-                  {uploading ? "Posting…" : "Post it"}
+                <button onClick={confirmUpload} disabled={uploading}
+                  className="flex-1 text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition disabled:opacity-60">
+                  {uploading ? 'Posting…' : 'Post it'}
                 </button>
               </div>
             )}
@@ -257,340 +172,178 @@ export default function HerdisClient({
       )}
 
       <div className="snap-y snap-mandatory h-[calc(100vh-132px)] overflow-y-scroll">
-        {list.map((item) => (
-          <HerdiItem
-            key={item.id}
-            item={item}
-            onLike={toggleLike}
-            onView={trackView}
-            onComment={() => setCommentsFor(item.id)}
-            onSend={() => setSendFor(item.id)}
-          />
+        {list.map(item => (
+          <HerdiItem key={item.id} item={item} onLike={toggleLike} onView={trackView}
+            onComment={() => setCommentsFor(item.id)} onSend={() => setSendFor(item.id)} />
         ))}
         {list.length === 0 && (
-          <div className="h-full flex items-center justify-center text-ink-faint text-sm">
-            No Herdis yet — post the first one.
-          </div>
+          <div className="h-full flex items-center justify-center text-ink-faint text-sm">No Herdis yet — post the first one.</div>
         )}
       </div>
 
-      {commentsFor && (
-        <CommentsDrawer
-          herdiId={commentsFor}
-          currentUserId={currentUserId}
-          onClose={() => setCommentsFor(null)}
-        />
-      )}
-      {sendFor && (
-        <SendToDmModal
-          herdiId={sendFor}
-          currentUserId={currentUserId}
-          onClose={() => setSendFor(null)}
-        />
-      )}
+      {commentsFor && <CommentsDrawer herdiId={commentsFor} currentUserId={currentUserId} onClose={() => setCommentsFor(null)} />}
+      {sendFor && <SendToDmModal herdiId={sendFor} currentUserId={currentUserId} onClose={() => setSendFor(null)} />}
     </div>
-  );
+  )
 }
 
 function HerdiItem({
-  item,
-  onLike,
-  onView,
-  onComment,
-  onSend,
-}: {
-  item: Item;
-  onLike: (id: string) => void;
-  onView: (id: string) => void;
-  onComment: () => void;
-  onSend: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
+  item, onLike, onView, onComment, onSend,
+}: { item: Item; onLike: (id: string) => void; onView: (id: string) => void; onComment: () => void; onSend: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = ref.current
+    if (!el) return
     const observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (e.isIntersecting) onView(item.id);
-        }),
-      { threshold: 0.6 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [item.id]);
+      entries => entries.forEach(e => { if (e.isIntersecting) onView(item.id) }),
+      { threshold: 0.6 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [item.id])
 
   async function copyShareLink() {
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/herdis/${item.id}`,
-    );
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    await navigator.clipboard.writeText(`${window.location.origin}/herdis/${item.id}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
-    <div
-      ref={ref}
-      className="snap-start h-[calc(100vh-132px)] relative flex items-center justify-center bg-black"
-    >
-      <video
-        src={item.videoUrl}
-        poster={item.thumbnailUrl ?? undefined}
-        className="max-h-full max-w-full"
-        controls
-        loop
-        autoPlay
-        muted
-        playsInline
-      />
+    <div ref={ref} className="snap-start h-[calc(100vh-132px)] relative flex items-center justify-center bg-black">
+      <video src={item.videoUrl} poster={item.thumbnailUrl ?? undefined} className="max-h-full max-w-full" controls loop autoPlay muted playsInline />
 
       <div className="absolute bottom-6 left-4 right-16 text-white">
-        <Link
-          href={`/u/${item.username}`}
-          className="font-mono text-sm font-semibold"
-        >
-          @{item.username}
-        </Link>
+        <Link href={`/u/${item.username}`} className="font-mono text-sm font-semibold">@{item.username}</Link>
         {item.caption && <p className="text-sm mt-1">{item.caption}</p>}
-        <p className="text-[10px] text-white/60 mt-1 font-mono">
-          {item.viewCount} views
-        </p>
+        <p className="text-[10px] text-white/60 mt-1 font-mono">{item.viewCount} views</p>
       </div>
 
       <div className="absolute bottom-6 right-4 flex flex-col items-center gap-4">
-        <button
-          onClick={() => onLike(item.id)}
-          className="flex flex-col items-center gap-1"
-        >
-          <span className={`text-3xl ${item.liked ? "" : "opacity-60"}`}>
-            {item.liked ? "❤️" : "🤍"}
-          </span>
+        <button onClick={() => onLike(item.id)} className="flex flex-col items-center gap-1">
+          <span className={`text-3xl ${item.liked ? '' : 'opacity-60'}`}>{item.liked ? '❤️' : '🤍'}</span>
           <span className="text-white text-xs font-mono">{item.likeCount}</span>
         </button>
-        <button
-          onClick={onComment}
-          className="flex flex-col items-center gap-1"
-        >
+        <button onClick={onComment} className="flex flex-col items-center gap-1">
           <span className="text-2xl opacity-80">💬</span>
         </button>
         <button onClick={onSend} className="flex flex-col items-center gap-1">
           <span className="text-2xl opacity-80">➤</span>
         </button>
-        <button
-          onClick={copyShareLink}
-          className="flex flex-col items-center gap-1"
-        >
+        <button onClick={copyShareLink} className="flex flex-col items-center gap-1">
           <span className="text-2xl opacity-80">🔗</span>
-          {copied && (
-            <span className="text-white text-[9px] font-mono">Copied</span>
-          )}
+          {copied && <span className="text-white text-[9px] font-mono">Copied</span>}
         </button>
       </div>
     </div>
-  );
+  )
 }
 
-function CommentsDrawer({
-  herdiId,
-  currentUserId,
-  onClose,
-}: {
-  herdiId: string;
-  currentUserId: string | null;
-  onClose: () => void;
-}) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [comments, setComments] = useState<any[]>([]);
-  const [usernames, setUsernames] = useState<Record<string, string>>({});
-  const [body, setBody] = useState("");
+function CommentsDrawer({ herdiId, currentUserId, onClose }: { herdiId: string; currentUserId: string | null; onClose: () => void }) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [comments, setComments] = useState<any[]>([])
+  const [usernames, setUsernames] = useState<Record<string, string>>({})
+  const [body, setBody] = useState('')
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("herdis_comments")
-        .select("id, user_id, body, created_at")
-        .eq("herdi_id", herdiId)
-        .order("created_at");
-      setComments(data || []);
-      const ids = [...new Set((data || []).map((c) => c.user_id))];
+      const { data } = await supabase.from('herdis_comments').select('id, user_id, body, created_at').eq('herdi_id', herdiId).order('created_at')
+      setComments(data || [])
+      const ids = [...new Set((data || []).map(c => c.user_id))]
       if (ids.length) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, username")
-          .in("id", ids);
-        const map: Record<string, string> = {};
-        profiles?.forEach((p) => {
-          map[p.id] = p.username;
-        });
-        setUsernames(map);
+        const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', ids)
+        const map: Record<string, string> = {}
+        profiles?.forEach(p => { map[p.id] = p.username })
+        setUsernames(map)
       }
     }
-    load();
-  }, [herdiId]);
+    load()
+  }, [herdiId])
 
   async function postComment(e: React.FormEvent) {
-    e.preventDefault();
-    if (!currentUserId) {
-      router.push("/login?redirect=/herdis");
-      return;
-    }
-    if (!body.trim()) return;
+    e.preventDefault()
+    if (!currentUserId) { router.push('/login?redirect=/herdis'); return }
+    if (!body.trim()) return
 
-    const { data } = await supabase
-      .from("herdis_comments")
-      .insert({ herdi_id: herdiId, user_id: currentUserId, body })
-      .select()
-      .single();
+    const { data } = await supabase.from('herdis_comments').insert({ herdi_id: herdiId, user_id: currentUserId, body }).select().single()
     if (data) {
-      setComments((prev) => [...prev, data]);
-      setUsernames((prev) => ({ ...prev }));
-      setBody("");
+      setComments(prev => [...prev, data])
+      setBody('')
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-end"
-      onClick={onClose}
-    >
-      <div
-        className="bg-surface w-full max-h-[70vh] rounded-t-xl p-4 flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>
+      <div className="bg-surface w-full max-h-[70vh] rounded-t-xl p-4 flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display font-semibold">Comments</h3>
-          <button onClick={onClose} className="text-ink-faint">
-            ✕
-          </button>
+          <button onClick={onClose} className="text-ink-faint">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto space-y-2 mb-3">
-          {comments.map((c) => (
+          {comments.map(c => (
             <div key={c.id} className="text-sm">
-              <span className="font-mono text-xs text-tag mr-2">
-                {usernames[c.user_id] ?? "…"}
-              </span>
+              <span className="font-mono text-xs text-tag mr-2">{usernames[c.user_id] ?? '…'}</span>
               {c.body}
             </div>
           ))}
-          {comments.length === 0 && (
-            <p className="text-sm text-ink-faint">No comments yet.</p>
-          )}
+          {comments.length === 0 && <p className="text-sm text-ink-faint">No comments yet.</p>}
         </div>
         <form onSubmit={postComment} className="flex gap-2">
-          <input
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Add a comment"
-            className="flex-1 bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition"
-          />
-          <button
-            type="submit"
-            className="text-xs font-mono bg-tag text-[#1a2015] font-semibold px-4 rounded hover:brightness-110 transition"
-          >
-            Post
-          </button>
+          <input value={body} onChange={e => setBody(e.target.value)} placeholder="Add a comment"
+            className="flex-1 bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition" />
+          <button type="submit" className="text-xs font-mono bg-tag text-[#1a2015] font-semibold px-4 rounded hover:brightness-110 transition">Post</button>
         </form>
       </div>
     </div>
-  );
+  )
 }
 
-function SendToDmModal({
-  herdiId,
-  currentUserId,
-  onClose,
-}: {
-  herdiId: string;
-  currentUserId: string | null;
-  onClose: () => void;
-}) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [status, setStatus] = useState("");
+function SendToDmModal({ herdiId, currentUserId, onClose }: { herdiId: string; currentUserId: string | null; onClose: () => void }) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [username, setUsername] = useState('')
+  const [status, setStatus] = useState('')
 
   async function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!currentUserId) {
-      router.push("/login?redirect=/herdis");
-      return;
-    }
-    setStatus("");
+    e.preventDefault()
+    if (!currentUserId) { router.push('/login?redirect=/herdis'); return }
+    setStatus('')
 
-    const { data: target } = await supabase
-      .from("profiles")
-      .select("id, username")
-      .eq("username", username.trim())
-      .maybeSingle();
-    if (!target) {
-      setStatus("No user with that username.");
-      return;
-    }
+    const { data: target } = await supabase.from('profiles').select('id, username').eq('username', username.trim()).maybeSingle()
+    if (!target) { setStatus('No user with that username.'); return }
 
-    const [userA, userB] = [currentUserId, target.id].sort();
-    const { data: existing } = await supabase
-      .from("dm_conversations")
-      .select("id")
-      .eq("user_a", userA)
-      .eq("user_b", userB)
-      .maybeSingle();
+    const [userA, userB] = [currentUserId, target.id].sort()
+    const { data: existing } = await supabase.from('dm_conversations').select('id').eq('user_a', userA).eq('user_b', userB).maybeSingle()
 
-    let conversationId = existing?.id;
+    let conversationId = existing?.id
     if (!conversationId) {
-      const { data: created, error } = await supabase
-        .from("dm_conversations")
-        .insert({ user_a: userA, user_b: userB })
-        .select()
-        .single();
-      if (error) {
-        setStatus(error.message);
-        return;
-      }
-      conversationId = created.id;
+      const { data: created, error } = await supabase.from('dm_conversations').insert({ user_a: userA, user_b: userB }).select().single()
+      if (error) { setStatus(error.message); return }
+      conversationId = created.id
     }
 
-    const link = `${window.location.origin}/herdis/${herdiId}`;
-    await supabase.from("chat_messages").insert({
-      conversation_id: conversationId,
-      sender_id: currentUserId,
-      body: `Sent a Herdi: ${link}`,
-    });
+    const link = `${window.location.origin}/herdis/${herdiId}`
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId, sender_id: currentUserId, body: `Sent a Herdi: ${link}`,
+    })
 
-    setStatus("Sent ✓");
-    setTimeout(() => {
-      onClose();
-      router.push(`/chat?dm=${target.username}`);
-    }, 700);
+    setStatus('Sent ✓')
+    setTimeout(() => { onClose(); router.push(`/chat?dm=${target.username}`) }, 700)
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6"
-      onClick={onClose}
-    >
-      <form
-        onSubmit={send}
-        className="bg-surface border border-line rounded-xl p-6 max-w-xs w-full space-y-3"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6" onClick={onClose}>
+      <form onSubmit={send} className="bg-surface border border-line rounded-xl p-6 max-w-xs w-full space-y-3" onClick={e => e.stopPropagation()}>
         <h3 className="font-display font-semibold">Send this Herdi</h3>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="username"
-          className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition"
-        />
+        <input value={username} onChange={e => setUsername(e.target.value)} placeholder="username"
+          className="w-full bg-bg-alt border border-line rounded px-3 py-2 text-sm focus:outline-none focus:border-tag transition" />
         {status && <p className="text-xs text-ink-faint">{status}</p>}
-        <button
-          type="submit"
-          className="w-full text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition"
-        >
+        <button type="submit" className="w-full text-xs font-mono bg-tag text-[#1a2015] font-semibold py-2 rounded hover:brightness-110 transition">
           Send
         </button>
       </form>
     </div>
-  );
+  )
 }
