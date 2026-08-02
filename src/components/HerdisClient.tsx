@@ -20,21 +20,25 @@ type Item = {
 };
 
 function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr]
+  const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  return copy
+  return copy;
 }
+
+type HerdisClientProps = {
+  items: Item[];
+  currentUserId: string | null;
+  isAdmin: boolean;
+};
 
 export default function HerdisClient({
   items,
   currentUserId,
-}: {
-  items: Item[];
-  currentUserId: string | null;
-}) {
+  isAdmin,
+}: HerdisClientProps) {
   const supabase = createClient();
   const router = useRouter();
   const [list, setList] = useState(items);
@@ -47,6 +51,9 @@ export default function HerdisClient({
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [sendFor, setSendFor] = useState<string | null>(null);
   const viewedRef = useRef<Set<string>>(new Set());
+
+  // reference isAdmin for future admin-only UI; keep eslint happy
+  void isAdmin;
 
   useEffect(() => {
     setList(shuffle(items));
