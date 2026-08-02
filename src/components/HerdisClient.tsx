@@ -19,6 +19,15 @@ type Item = {
   viewCount: number;
 };
 
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
 export default function HerdisClient({
   items,
   currentUserId,
@@ -40,7 +49,7 @@ export default function HerdisClient({
   const viewedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    setList(items);
+    setList(shuffle(items));
   }, [items]);
 
   async function toggleLike(id: string) {
@@ -387,7 +396,7 @@ function HerdisPlayer({
     >
       <div
         className="transition-transform duration-300 ease-out"
-        style={{ transform: `translateY(-${index * 100}%)` }}
+        style={{ transform: `translateY(calc(-${index} * (100dvh - 132px)))` }}
       >
         {list.map((item, i) => (
           <HerdiSlide
