@@ -1,49 +1,35 @@
-// src/app/herdis/page.tsx
+// src/app/api/herdis/more/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import HerdisClient from "@/components/HerdisClient";
 import { computeHerdiScore } from "@/utils/herdiScore";
 
-export default async function HerdisPage() {
+export async function POST(req: NextRequest) {
+  const { excludeIds }: { excludeIds: string[] } = await req.json();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let isAdmin = false;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .single();
-    isAdmin = profile?.is_admin ?? false;
-  }
-
-  const { data: herdis, error: herdisError } = await supabase
+  const { data: herdis } = await supabase
     .from("herdis")
     .select(
       "id, video_url, thumbnail_url, caption, view_count, profile_id, created_at, profiles!herdis_profile_id_fkey(username)",
     )
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(100);
 
-  if (herdisError) console.error("Herdis fetch error:", herdisError);
+  const filtered = (herdis || []).filter((h) => !excludeIds.includes(h.id));
+  if (filtered.length === 0) return NextResponse.json({ items: [] });
 
-  const ids = (herdis || []).map((h) => h.id);
-
-  const { data: likeCounts } = ids.length
-    ? await supabase
-        .from("herdis_like_counts")
-        .select("herdi_id, like_count")
-        .in("herdi_id", ids)
-    : { data: [] };
-  const { data: commentCounts } = ids.length
-    ? await supabase
-        .from("herdis_comment_counts")
-        .select("herdi_id, comment_count")
-        .in("herdi_id", ids)
-    : { data: [] };
-
+  const ids = filtered.map((h) => h.id);
+  const { data: likeCounts } = await supabase
+    .from("herdis_like_counts")
+    .select("herdi_id, like_count")
+    .in("herdi_id", ids);
+  const { data: commentCounts } = await supabase
+    .from("herdis_comment_counts")
+    .select("herdi_id, comment_count")
+    .in("herdi_id", ids);
   const likeMap = new Map(
     (likeCounts || []).map((l) => [l.herdi_id, l.like_count]),
   );
@@ -60,7 +46,7 @@ export default async function HerdisPage() {
     likedIds = new Set((myLikes || []).map((l) => l.herdi_id));
   }
 
-  const items = (herdis || [])
+  const items = filtered
     .map((h: any) => {
       const likeCount = likeMap.get(h.id) ?? 0;
       const commentCount = commentMap.get(h.id) ?? 0;
@@ -82,13 +68,8 @@ export default async function HerdisPage() {
         ),
       };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
 
-  return (
-    <HerdisClient
-      items={items}
-      currentUserId={user?.id ?? null}
-      isAdmin={isAdmin}
-    />
-  );
+  return NextResponse.json({ items });
 }

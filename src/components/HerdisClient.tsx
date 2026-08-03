@@ -19,15 +19,6 @@ type Item = {
   viewCount: number;
 };
 
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
 type HerdisClientProps = {
   items: Item[];
   currentUserId: string | null;
@@ -52,18 +43,22 @@ export default function HerdisClient({
   const [sendFor, setSendFor] = useState<string | null>(null);
   const viewedRef = useRef<Set<string>>(new Set());
 
-  // reference isAdmin for future admin-only UI; keep eslint happy
-  void isAdmin;
-
+  // The server (herdis/page.tsx) already ranks this by score before it
+  // ever gets here — no client-side shuffling needed anymore.
   useEffect(() => {
-    setList(shuffle(items));
+    setList(items);
   }, [items]);
-async function deleteHerdi(id: string) {
-  if (!confirm('Delete this post?')) return
-  const { error } = await supabase.from('herdis').delete().eq('id', id)
-  if (error) { alert(error.message); return }
-  setList(prev => prev.filter(i => i.id !== id))
-}
+
+  async function deleteHerdi(id: string) {
+    if (!confirm("Delete this post?")) return;
+    const { error } = await supabase.from("herdis").delete().eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setList((prev) => prev.filter((i) => i.id !== id));
+  }
+
   async function toggleLike(id: string) {
     if (!currentUserId) {
       router.push("/login?redirect=/herdis");
@@ -275,15 +270,15 @@ async function deleteHerdi(id: string) {
         </div>
       )}
 
-     <HerdisPlayer
-  list={list}
-  onLike={toggleLike}
-  onView={trackView}
-  onComment={(id) => setCommentsFor(id)}
-  onSend={(id) => setSendFor(id)}
-  isAdmin={isAdmin}
-  onDelete={deleteHerdi}
-/>
+      <HerdisPlayer
+        list={list}
+        onLike={toggleLike}
+        onView={trackView}
+        onComment={(id) => setCommentsFor(id)}
+        onSend={(id) => setSendFor(id)}
+        isAdmin={isAdmin}
+        onDelete={deleteHerdi}
+      />
 
       {commentsFor && (
         <CommentsDrawer
@@ -303,7 +298,7 @@ async function deleteHerdi(id: string) {
   );
 }
 
-// ---------- The custom shorts player ----------
+// ---------- The custom shorts player, with infinite wrap-around + background loading ----------
 
 function HerdisPlayer({
   list, onLike, onView, onComment, onSend, isAdmin, onDelete,
@@ -314,15 +309,20 @@ function HerdisPlayer({
 }) {
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(true);
+  const [extendedList, setExtendedList] = useState(list);
   const transitioningRef = useRef(false);
   const touchStartY = useRef<number | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const seenIdsRef = useRef<Set<string>>(new Set(list.map((i) => i.id)));
+  const loadingMoreRef = useRef(false);
 
-  // Plays exactly one video, pauses the rest. Called SYNCHRONOUSLY from
-  // inside the gesture handlers below (wheel/touch/key), not from a
-  // useEffect — iOS Safari silently blocks .play() if it isn't called
-  // directly within the user gesture's own call stack. That's what was
-  // causing the video to "disappear" (go black/frozen) after swiping.
+  // When the server sends a freshly-ranked base list (e.g. after posting),
+  // reset the extended (infinite-scroll-grown) list back to match it.
+  useEffect(() => {
+    setExtendedList(list);
+    seenIdsRef.current = new Set(list.map((i) => i.id));
+  }, [list]);
+
   function playAt(i: number) {
     videoRefs.current.forEach((v, vi) => {
       if (!v) return;
@@ -335,23 +335,54 @@ function HerdisPlayer({
     });
   }
 
-  // Handles the very first video on initial mount only — every
-  // subsequent change goes through goTo(), which plays synchronously.
   useEffect(() => {
     playAt(index);
-    if (list[index]) onView(list[index].id);
+    if (extendedList[index]) onView(extendedList[index].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadMore() {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+
+    try {
+      const res = await fetch("/api/herdis/more", {
+        method: "POST",
+        body: JSON.stringify({ excludeIds: [...seenIdsRef.current] }),
+      });
+      const { items: more } = await res.json();
+
+      if (more && more.length > 0) {
+        more.forEach((m: Item) => seenIdsRef.current.add(m.id));
+        setExtendedList((prev) => [...prev, ...more]);
+      }
+      // If nothing new comes back, wrap-around in goTo() means playback
+      // just loops through what's already loaded instead of stopping.
+    } catch {
+      // silent — worst case, wrap-around still keeps playback going
+    }
+
+    loadingMoreRef.current = false;
+  }
+
   function goTo(newIndex: number) {
-    if (transitioningRef.current) return;
-    const clamped = Math.max(0, Math.min(list.length - 1, newIndex));
-    if (clamped === index) return;
+    if (transitioningRef.current || extendedList.length === 0) return;
+
+    // Wraps instead of clamping — scrolling past the last video loops
+    // back to the first, so there's never a hard "end" to the feed.
+    const wrapped =
+      ((newIndex % extendedList.length) + extendedList.length) %
+      extendedList.length;
+    if (wrapped === index) return;
 
     transitioningRef.current = true;
-    playAt(clamped);
-    setIndex(clamped);
-    if (list[clamped]) onView(list[clamped].id);
+    playAt(wrapped);
+    setIndex(wrapped);
+    if (extendedList[wrapped]) onView(extendedList[wrapped].id);
+
+    // Getting close to the end of what's loaded — quietly fetch more.
+    if (wrapped >= extendedList.length - 3) loadMore();
+
     setTimeout(() => {
       transitioningRef.current = false;
     }, 320);
@@ -384,7 +415,7 @@ function HerdisPlayer({
     }
   }
 
-  if (list.length === 0) {
+  if (extendedList.length === 0) {
     return (
       <div className="h-[100dvh] flex items-center justify-center text-ink-faint text-sm">
         No Herdis yet — post the first one.
@@ -406,25 +437,27 @@ function HerdisPlayer({
         className="transition-transform duration-300 ease-out"
         style={{ transform: `translateY(calc(-${index} * (100dvh - 132px)))` }}
       >
-        {list.map((item, i) => (
-         <HerdiSlide
-  key={item.id}
-  item={item}
-  isActive={i === index}
-  muted={muted}
-  setMuted={setMuted}
-  videoRef={(el) => { videoRefs.current[i] = el }}
-  onLike={onLike}
-  onComment={() => onComment(item.id)}
-  onSend={() => onSend(item.id)}
-  isAdmin={isAdmin}
-  onDelete={() => onDelete(item.id)}
-/>
+        {extendedList.map((item, i) => (
+          <HerdiSlide
+            key={item.id}
+            item={item}
+            isActive={i === index}
+            muted={muted}
+            setMuted={setMuted}
+            videoRef={(el) => {
+              videoRefs.current[i] = el;
+            }}
+            onLike={onLike}
+            onComment={() => onComment(item.id)}
+            onSend={() => onSend(item.id)}
+            isAdmin={isAdmin}
+            onDelete={() => onDelete(item.id)}
+          />
         ))}
       </div>
 
       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
-        {list.map((_, i) => (
+        {extendedList.map((_, i) => (
           <div
             key={i}
             className={`w-1 h-1 rounded-full transition ${i === index ? "bg-tag" : "bg-white/20"}`}
@@ -508,11 +541,16 @@ function HerdiSlide({
           <span className="text-6xl text-white/85">▶</span>
         </button>
       )}
-{isAdmin && (
-  <button onClick={onDelete} className="absolute top-4 left-4 text-white text-xl z-10 bg-flag/80 rounded-full w-9 h-9 flex items-center justify-center">
-    🗑️
-  </button>
-)}
+
+      {isAdmin && (
+        <button
+          onClick={onDelete}
+          className="absolute top-4 left-4 text-white text-xl z-10 bg-flag/80 rounded-full w-9 h-9 flex items-center justify-center"
+        >
+          🗑️
+        </button>
+      )}
+
       <button
         onClick={() => setMuted((m) => !m)}
         className="absolute top-4 right-4 text-white text-xl z-10"

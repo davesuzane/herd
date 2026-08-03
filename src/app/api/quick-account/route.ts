@@ -4,10 +4,14 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const admin = createServiceClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are required")
+  }
+  return createServiceClient(supabaseUrl, supabaseKey)
+}
 
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
@@ -52,6 +56,7 @@ export async function POST(req: NextRequest) {
 
   let code = "";
   let email = "";
+  const admin = createAdminClient()
   for (let attempt = 0; attempt < 5; attempt++) {
     code = generateCode();
     email = `guest-${code}@guest.sulladeal.internal`;
