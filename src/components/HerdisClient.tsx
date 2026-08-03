@@ -43,8 +43,6 @@ export default function HerdisClient({
   const [sendFor, setSendFor] = useState<string | null>(null);
   const viewedRef = useRef<Set<string>>(new Set());
 
-  // The server (herdis/page.tsx) already ranks this by score before it
-  // ever gets here — no client-side shuffling needed anymore.
   useEffect(() => {
     setList(items);
   }, [items]);
@@ -301,11 +299,21 @@ export default function HerdisClient({
 // ---------- The custom shorts player, with infinite wrap-around + background loading ----------
 
 function HerdisPlayer({
-  list, onLike, onView, onComment, onSend, isAdmin, onDelete,
+  list,
+  onLike,
+  onView,
+  onComment,
+  onSend,
+  isAdmin,
+  onDelete,
 }: {
-  list: Item[]; onLike: (id: string) => void; onView: (id: string) => void
-  onComment: (id: string) => void; onSend: (id: string) => void
-  isAdmin: boolean; onDelete: (id: string) => void
+  list: Item[];
+  onLike: (id: string) => void;
+  onView: (id: string) => void;
+  onComment: (id: string) => void;
+  onSend: (id: string) => void;
+  isAdmin: boolean;
+  onDelete: (id: string) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -316,8 +324,6 @@ function HerdisPlayer({
   const seenIdsRef = useRef<Set<string>>(new Set(list.map((i) => i.id)));
   const loadingMoreRef = useRef(false);
 
-  // When the server sends a freshly-ranked base list (e.g. after posting),
-  // reset the extended (infinite-scroll-grown) list back to match it.
   useEffect(() => {
     setExtendedList(list);
     seenIdsRef.current = new Set(list.map((i) => i.id));
@@ -356,8 +362,6 @@ function HerdisPlayer({
         more.forEach((m: Item) => seenIdsRef.current.add(m.id));
         setExtendedList((prev) => [...prev, ...more]);
       }
-      // If nothing new comes back, wrap-around in goTo() means playback
-      // just loops through what's already loaded instead of stopping.
     } catch {
       // silent — worst case, wrap-around still keeps playback going
     }
@@ -368,8 +372,6 @@ function HerdisPlayer({
   function goTo(newIndex: number) {
     if (transitioningRef.current || extendedList.length === 0) return;
 
-    // Wraps instead of clamping — scrolling past the last video loops
-    // back to the first, so there's never a hard "end" to the feed.
     const wrapped =
       ((newIndex % extendedList.length) + extendedList.length) %
       extendedList.length;
@@ -380,7 +382,6 @@ function HerdisPlayer({
     setIndex(wrapped);
     if (extendedList[wrapped]) onView(extendedList[wrapped].id);
 
-    // Getting close to the end of what's loaded — quietly fetch more.
     if (wrapped >= extendedList.length - 3) loadMore();
 
     setTimeout(() => {
@@ -469,17 +470,33 @@ function HerdisPlayer({
 }
 
 function HerdiSlide({
-  item, isActive, muted, setMuted, videoRef, onLike, onComment, onSend, isAdmin, onDelete,
+  item,
+  isActive,
+  muted,
+  setMuted,
+  videoRef,
+  onLike,
+  onComment,
+  onSend,
+  isAdmin,
+  onDelete,
 }: {
-  item: Item; isActive: boolean; muted: boolean; setMuted: (fn: (m: boolean) => boolean) => void
-  videoRef: (el: HTMLVideoElement | null) => void
-  onLike: (id: string) => void; onComment: () => void; onSend: () => void
-  isAdmin: boolean; onDelete: () => void
+  item: Item;
+  isActive: boolean;
+  muted: boolean;
+  setMuted: (fn: (m: boolean) => boolean) => void;
+  videoRef: (el: HTMLVideoElement | null) => void;
+  onLike: (id: string) => void;
+  onComment: () => void;
+  onSend: () => void;
+  isAdmin: boolean;
+  onDelete: () => void;
 }) {
   const localRef = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
   function setRefs(el: HTMLVideoElement | null) {
     localRef.current = el;
@@ -521,16 +538,30 @@ function HerdiSlide({
         />
       </div>
 
+      {/* Thumbnail rendered as a real <img> instead of the native `poster`
+          attribute — some mobile Safari versions ignore object-fit on
+          poster images and stretch them, even though the video itself
+          plays back correctly with object-cover. This avoids that bug
+          entirely by never using poster at all. */}
+      {item.thumbnailUrl && !videoLoaded && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.thumbnailUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+
       <video
         ref={setRefs}
         src={item.videoUrl}
-        poster={item.thumbnailUrl ?? undefined}
         className="absolute inset-0 w-full h-full object-cover"
         loop
         muted={muted}
         playsInline
         onClick={togglePlay}
         onTimeUpdate={handleTimeUpdate}
+        onLoadedData={() => setVideoLoaded(true)}
       />
 
       {!playing && isActive && (
