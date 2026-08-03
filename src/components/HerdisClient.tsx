@@ -544,25 +544,25 @@ function HerdiSlide({
           plays back correctly with object-cover. This avoids that bug
           entirely by never using poster at all. */}
       {item.thumbnailUrl && !videoLoaded && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.thumbnailUrl}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      )}
+  // eslint-disable-next-line @next/next/no-img-element
+  <img
+    src={item.thumbnailUrl}
+    alt=""
+    className="absolute inset-0 w-full h-full object-contain"
+  />
+)}
 
-      <video
-        ref={setRefs}
-        src={item.videoUrl}
-        className="absolute inset-0 w-full h-full object-cover"
-        loop
-        muted={muted}
-        playsInline
-        onClick={togglePlay}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedData={() => setVideoLoaded(true)}
-      />
+<video
+  ref={setRefs}
+  src={item.videoUrl}
+  className="absolute inset-0 w-full h-full object-contain"
+  loop
+  muted={muted}
+  playsInline
+  onClick={togglePlay}
+  onTimeUpdate={handleTimeUpdate}
+  onLoadedData={() => setVideoLoaded(true)}
+/>
 
       {!playing && isActive && (
         <button
