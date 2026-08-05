@@ -7,10 +7,10 @@ export default function SubNav() {
     <div className="border-b border-line bg-bg-alt">
       <div className="max-w-5xl mx-auto px-6 h-10 flex items-center gap-6">
         <Link
-          href="/leaked"
+          href="/shop"
           className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
         >
-          Leaked
+          Shop
         </Link>
         <Link
           href="/util-sites"
@@ -41,6 +41,12 @@ export default function SubNav() {
           className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
         >
           TruthDump
+        </Link>
+        <Link
+          href="#"
+          className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
+        >
+          find people
         </Link>
       </div>
     </div>

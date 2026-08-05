@@ -23,6 +23,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+  if (event.type === "account.updated") {
+    const account = event.data.object as Stripe.Account;
+    if (account.charges_enabled) {
+      await supabase
+        .from("profiles")
+        .update({ stripe_connect_onboarded: true })
+        .eq("stripe_connect_account_id", account.id);
+    }
+  }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
@@ -37,6 +46,18 @@ export async function POST(req: NextRequest) {
         .from("apis")
         .update({ boosted_until: boostedUntil })
         .eq("id", apiId);
+    }
+    if (session.mode === "payment" && session.metadata?.type === "shop_order") {
+      const orderId = session.metadata.orderId;
+      const itemId = session.metadata.itemId;
+      await supabase
+        .from("shop_orders")
+        .update({ status: "paid" })
+        .eq("id", orderId);
+      await supabase
+        .from("shop_items")
+        .update({ status: "sold" })
+        .eq("id", itemId);
     }
   }
 
