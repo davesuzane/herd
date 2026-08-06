@@ -48,16 +48,18 @@ export async function POST(req: NextRequest) {
         .eq("id", apiId);
     }
     if (session.mode === "payment" && session.metadata?.type === "shop_order") {
-      const orderId = session.metadata.orderId;
-      const itemId = session.metadata.itemId;
-      await supabase
-        .from("shop_orders")
-        .update({ status: "paid" })
-        .eq("id", orderId);
-      await supabase
-        .from("shop_items")
-        .update({ status: "sold" })
-        .eq("id", itemId);
+      const orderIds: string[] = JSON.parse(session.metadata.orderIds || "[]");
+      const itemIds: string[] = JSON.parse(session.metadata.itemIds || "[]");
+      if (orderIds.length)
+        await supabase
+          .from("shop_orders")
+          .update({ status: "paid" })
+          .in("id", orderIds);
+      if (itemIds.length)
+        await supabase
+          .from("shop_items")
+          .update({ status: "sold" })
+          .in("id", itemIds);
     }
   }
 

@@ -13,21 +13,33 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const { itemId } = await req.json();
+  const { itemIds }: { itemIds: string[] } = await req.json();
+  if (!itemIds || itemIds.length === 0)
+    return NextResponse.json({ error: "No items." }, { status: 400 });
 
-  const { data: item } = await supabase
+  const { data: items } = await supabase
     .from("shop_items")
     .select("*")
-    .eq("id", itemId)
-    .eq("status", "active")
-    .single();
-  if (!item)
-    return NextResponse.json({ error: "Item not available." }, { status: 404 });
+    .in("id", itemIds)
+    .eq("status", "active");
+  if (!items || items.length === 0)
+    return NextResponse.json(
+      { error: "Items not available." },
+      { status: 404 },
+    );
 
+  const sellerIds = new Set(items.map((i) => i.seller_id));
+  if (sellerIds.size > 1)
+    return NextResponse.json(
+      { error: "All items in one checkout must be from the same seller." },
+      { status: 400 },
+    );
+
+  const sellerId = items[0].seller_id;
   const { data: seller } = await supabase
     .from("profiles")
     .select("stripe_connect_account_id, stripe_connect_onboarded")
-    .eq("id", item.seller_id)
+    .eq("id", sellerId)
     .single();
   if (!seller?.stripe_connect_onboarded || !seller.stripe_connect_account_id) {
     return NextResponse.json(
@@ -37,48 +49,56 @@ export async function POST(req: NextRequest) {
   }
 
   const feePercent = Number(process.env.PLATFORM_FEE_PERCENT ?? "10");
-  const platformFeeCents = Math.round(item.price_cents * (feePercent / 100));
+  const totalCents = items.reduce((sum, i) => sum + i.price_cents, 0);
+  const platformFeeCents = Math.round(totalCents * (feePercent / 100));
 
-  const { data: order } = await supabase
-    .from("shop_orders")
-    .insert({
-      item_id: item.id,
-      buyer_id: user.id,
-      seller_id: item.seller_id,
-      amount_cents: item.price_cents,
-      platform_fee_cents: platformFeeCents,
-      status: "pending",
-    })
-    .select()
-    .single();
+  const orderIds: string[] = [];
+  for (const item of items) {
+    const itemFee = Math.round(item.price_cents * (feePercent / 100));
+    const { data: order } = await supabase
+      .from("shop_orders")
+      .insert({
+        item_id: item.id,
+        buyer_id: user.id,
+        seller_id: sellerId,
+        amount_cents: item.price_cents,
+        platform_fee_cents: itemFee,
+        status: "pending",
+      })
+      .select()
+      .single();
+    if (order) orderIds.push(order.id);
+  }
 
   const origin = req.headers.get("origin");
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: { name: item.title },
-          unit_amount: item.price_cents,
-        },
-        quantity: 1,
+    line_items: items.map((item) => ({
+      price_data: {
+        currency: "usd",
+        product_data: { name: item.title },
+        unit_amount: item.price_cents,
       },
-    ],
+      quantity: 1,
+    })),
     payment_intent_data: {
       application_fee_amount: platformFeeCents,
       transfer_data: { destination: seller.stripe_connect_account_id },
     },
     success_url: `${origin}/shop?purchased=1`,
-    cancel_url: `${origin}/shop`,
-    metadata: { type: "shop_order", orderId: order.id, itemId: item.id },
+    cancel_url: `${origin}/shop/cart`,
+    metadata: {
+      type: "shop_order",
+      orderIds: JSON.stringify(orderIds),
+      itemIds: JSON.stringify(items.map((i) => i.id)),
+    },
   });
 
   await supabase
     .from("shop_orders")
     .update({ stripe_checkout_session_id: session.id })
-    .eq("id", order.id);
+    .in("id", orderIds);
 
   return NextResponse.json({ url: session.url });
 }

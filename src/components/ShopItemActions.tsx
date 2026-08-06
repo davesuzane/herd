@@ -10,7 +10,7 @@ export default function BuyButton({ itemId }: { itemId: string }) {
   async function handleBuy() {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await upabase.auth.getUser();
     if (!user) {
       router.push(`/login?redirect=/shop`);
       return;

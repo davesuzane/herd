@@ -9,6 +9,7 @@ import SubNav from "@/components/SubNav";
 import FloatingChatButton from "@/components/FloatingChatButton";
 import PresenceProvider from "@/components/PresenceProvider";
 import StoriesTraySection from "@/components/StoriesTraySection";
+import CartProvider from "@/components/CartContext";
 
 const zilla = Zilla_Slab({
   subsets: ["latin"],
@@ -43,13 +44,15 @@ export default function RootLayout({
     >
       <body className="font-body min-h-screen flex flex-col">
         <PresenceProvider>
-          <Analytics />
+          <CartProvider>
+            <Analytics />
 
-          <Nav />
-          <SubNav />
-          <StoriesTraySection />
-          <div className="flex-1">{children}</div>
-          <Footer />
+            <Nav />
+            <SubNav />
+            <StoriesTraySection />
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </CartProvider>
         </PresenceProvider>
       </body>
     </html>
