@@ -31,10 +31,10 @@ export default function SubNav() {
           party
         </Link>
         <Link
-          href="/herdis"
+          href="/apis"
           className="text-xs font-mono text-ink-faint hover:text-ink-dim transition"
         >
-          Herdis
+          APIs
         </Link>
         <Link
           href="/TruthDump"

@@ -1,13 +1,11 @@
 // src/components/Nav.tsx
 "use client";
-
 import { useEffect, useState } from "react";
-import AuthGateButton from "./AuthGateButton";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Settings } from "lucide-react";
-import { LogOut } from "lucide-react";
+import AuthGateButton from "./AuthGateButton";
+import CartLink from "./CartLink";
 
 type Profile = { username: string; is_pro: boolean; avatar_url: string | null };
 
@@ -66,15 +64,18 @@ export default function Nav() {
           Herd
         </Link>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/apis#browse"
+            className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
+          >
+            Browse
+          </Link>
+
+          <CartLink />
+
           {profile ? (
             <div className="flex items-center gap-4">
-              <Link
-                href="/connections"
-                className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
-              >
-                Your people
-              </Link>
               <Link
                 href={`/u/${profile.username}`}
                 className="flex items-center gap-2 text-sm font-mono text-ink-dim hidden sm:flex hover:text-ink transition-colors"
@@ -92,24 +93,18 @@ export default function Nav() {
                   <span className="text-tag text-xs">★ Pro</span>
                 )}
               </Link>
-              <Link
-                href="/account"
-                className="text-sm text-ink-dim hover:text-ink transition-colors hidden sm:block"
-              >
-                <Settings />
-              </Link>
-              <Link
-                href="/chat"
-                className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
-              >
-                chat
-              </Link>
               <button
                 onClick={signOut}
-                className="bg-red font-semibold px-4 py-2 rounded hover:brightness-110 transition"
+                className="text-sm text-ink-faint hover:text-ink transition-colors"
               >
-                <LogOut />
+                Sign out
               </button>
+              <Link
+                href="/submit"
+                className="bg-tag text-[#1a2015] font-semibold text-sm px-4 py-2 rounded hover:brightness-110 transition"
+              >
+                Add an API
+              </Link>
             </div>
           ) : (
             <>
